@@ -49,6 +49,7 @@ function App() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [tagTarget, setTagTarget] = useState<ContextTarget | null>(null);
   const [tagInput, setTagInput] = useState("");
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
   const refreshLibrary = useCallback(async () => {
     try {
@@ -99,9 +100,12 @@ function App() {
   const visibleDrawings = useMemo(() => {
     const searchedDrawings = query.trim() ? searchResults ?? [] : library.drawings;
     return searchedDrawings.filter((drawing) =>
-      !selectedFolderPath || drawing.path.startsWith(`${selectedFolderPath}/`),
+      (!selectedFolderPath || drawing.path.startsWith(`${selectedFolderPath}/`))
+      && (!selectedTag || drawing.tags.includes(selectedTag)),
     );
-  }, [library.drawings, query, searchResults, selectedFolderPath]);
+  }, [library.drawings, query, searchResults, selectedFolderPath, selectedTag]);
+
+  const libraryTags = useMemo(() => [...new Set(library.drawings.flatMap((drawing) => drawing.tags))].sort(), [library.drawings]);
 
   const recentDrawings = library.drawings.slice(0, 6);
   const handleCanvasSaved = useCallback(() => {
@@ -293,6 +297,7 @@ function App() {
     setIsCreating(true);
     try {
       await libraryApi.setDrawingTags(tagTarget.path, tagInput.split(","));
+      await refreshLibrary();
       setTagTarget(null);
     } catch (cause) {
       setError(asMessage(cause, "Couldn’t save Finder tags."));
@@ -484,6 +489,10 @@ function App() {
                   onContextMenu={(event) => openContextMenu(event, { kind: "folder", path: folder.path, label: folder.name })}
                 />
               ))}
+              <div className="tag-filter" aria-label="Filter by Finder tag">
+                <button className={!selectedTag ? "is-selected" : ""} type="button" onClick={() => setSelectedTag(null)}>All tags</button>
+                {libraryTags.map((tag) => <button className={selectedTag === tag ? "is-selected" : ""} key={tag} type="button" onClick={() => setSelectedTag(tag)}>#{tag}</button>)}
+              </div>
               <div className="tree-drawings">
                 {visibleDrawings.map((drawing) => (
                   <DrawingItem

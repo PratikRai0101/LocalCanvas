@@ -111,6 +111,9 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .tree-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree-count { margin-left: auto; color: #9d9a9f; font-family: "DM Mono", monospace; font-size: 10px; }
 .tree-drawings { padding-top: 2px; }
+.tag-filter { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 7px 4px; }
+.tag-filter button { max-width: 100%; padding: 3px 6px; overflow: hidden; color: #716e76; text-overflow: ellipsis; white-space: nowrap; background: #eeecef; border: 0; border-radius: 4px; font-size: 10px; }
+.tag-filter button:hover, .tag-filter button.is-selected { color: #403d90; background: #e3e1fa; }
 
 .recent-section { min-height: 116px; max-height: 30vh; margin-top: 12px; overflow: auto; }
 .recent-item { display: flex; width: 100%; gap: 8px; padding: 5px 6px; color: #525157; text-align: left; background: transparent; border: 0; border-radius: 6px; }
