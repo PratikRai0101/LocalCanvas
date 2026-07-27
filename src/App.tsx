@@ -1,6 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { loadFromBlob, serializeAsJSON } from "@excalidraw/excalidraw";
-import { FormEvent, MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, SaveStatus } from "./canvas/Canvas";
 import type { PortalLink } from "./canvas/portalMetadata";
 import {
@@ -8,11 +8,13 @@ import {
   FolderSummary,
   GraphData,
   LibraryState,
+  SceneVersion,
   libraryApi,
 } from "./library/api";
 import { ThumbnailGrid } from "./library/ThumbnailGrid";
 import { CommandPalette } from "./search/CommandPalette";
 import { GraphView } from "./graph/GraphView";
+import { HistoryPanel } from "./history/HistoryPanel";
 import "./App.css";
 
 type DialogKind = "drawing" | "folder" | null;
@@ -47,6 +49,11 @@ function App() {
   const [backlinks, setBacklinks] = useState<DrawingSummary[]>([]);
   const [isGraphOpen, setIsGraphOpen] = useState(false);
   const [graph, setGraph] = useState<GraphData | null>(null);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [versions, setVersions] = useState<SceneVersion[]>([]);
+  const [canvasRevision, setCanvasRevision] = useState(0);
+  const flushCanvasSave = useRef<(() => Promise<void>) | null>(null);
   const handleSaveStatus = useCallback((status: SaveStatus) => {
     if (status === "error") {
       setError("Couldn’t save this drawing. Your latest changes may not be on disk.");
@@ -318,6 +325,7 @@ function App() {
 
   function selectDrawing(drawing: DrawingSummary) {
     setActiveDrawing(drawing);
+    setIsHistoryOpen(false);
     setSelectedFolderPath(parentPath(drawing.path));
     setIsGraphOpen(false);
     handleSaveStatus("saved");
@@ -339,6 +347,36 @@ function App() {
     } catch (cause) {
       setError(asMessage(cause, "Couldn’t update the pinned drawing."));
     }
+  }
+
+  async function openHistory() {
+    if (!activeDrawing || isLoadingHistory) {
+      return;
+    }
+
+    setIsLoadingHistory(true);
+    try {
+      await flushCanvasSave.current?.();
+      setVersions(await libraryApi.listSceneVersions(activeDrawing.path));
+      setIsHistoryOpen(true);
+      setError(null);
+    } catch (cause) {
+      setError(asMessage(cause, "Couldn’t load version history."));
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  }
+
+  async function restoreVersion(version: SceneVersion) {
+    if (!activeDrawing) {
+      return;
+    }
+
+    await flushCanvasSave.current?.();
+    await libraryApi.restoreSceneVersion(activeDrawing.path, version.id);
+    await refreshLibrary();
+    setCanvasRevision((revision) => revision + 1);
+    setIsHistoryOpen(false);
   }
 
   async function openGraph() {
@@ -381,12 +419,14 @@ function App() {
 
   function browseFolder(path: string) {
     setSelectedFolderPath(path);
+    setIsHistoryOpen(false);
     setActiveDrawing(null);
     setIsGraphOpen(false);
   }
 
   function browseTag(tag: string) {
     setSelectedTag(tag);
+    setIsHistoryOpen(false);
     setSelectedFolderPath("");
     setActiveDrawing(null);
     setIsGraphOpen(false);
@@ -395,6 +435,7 @@ function App() {
 
   function showAllDrawings() {
     setSelectedTag(null);
+    setIsHistoryOpen(false);
     setSelectedFolderPath("");
     setActiveDrawing(null);
     setIsGraphOpen(false);
@@ -707,6 +748,7 @@ function App() {
             {activeDrawing && <><b>/</b><strong>{activeDrawing.title}</strong></>}
           </div>
           <div className="workspace-actions">
+            <button className="history-button" type="button" onClick={() => void openHistory()} disabled={!activeDrawing || isLoadingHistory}>{isLoadingHistory ? "Loading…" : "History"}</button>
             <button className="graph-button" type="button" onClick={() => void openGraph()} disabled={!library.root}>Graph</button>
             <label className="search-box">
             <span>⌕</span>
@@ -742,14 +784,24 @@ function App() {
         ) : activeDrawing ? (
           <>
             <Canvas
-              key={activeDrawing.path}
+              key={`${activeDrawing.path}:${canvasRevision}`}
               drawingPath={activeDrawing.path}
               drawingTitle={activeDrawing.title}
               onSaveStatus={handleSaveStatus}
               onSaved={handleCanvasSaved}
+              onAutosaveController={(controller) => { flushCanvasSave.current = controller?.flush ?? null; }}
               portalTargets={library.drawings.filter((drawing) => drawing.path !== activeDrawing.path)}
               onOpenPortal={openPortal}
             />
+            {isHistoryOpen && (
+              <HistoryPanel
+                drawingPath={activeDrawing.path}
+                drawingTitle={activeDrawing.title}
+                versions={versions}
+                onRestore={restoreVersion}
+                onClose={() => setIsHistoryOpen(false)}
+              />
+            )}
             {backlinks.length > 0 && (
               <aside className="backlinks-panel" aria-label="Backlinks">
                 <p>BACKLINKS</p>

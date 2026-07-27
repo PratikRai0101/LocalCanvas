@@ -133,8 +133,11 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .workspace { position: relative; display: flex; min-width: 0; flex: 1; flex-direction: column; overflow: hidden; background: #fefefe; }
 .workspace-header { display: flex; align-items: center; justify-content: space-between; flex: 0 0 58px; gap: 20px; padding: 0 24px; border-bottom: 1px solid #ecebed; background: rgba(255, 255, 255, .94); }
 .workspace-actions { display: flex; align-items: center; gap: 8px; }
-.graph-button { padding: 5px 9px; color: #5f5ab9; background: #f2f1ff; border: 1px solid #deddff; border-radius: 6px; cursor: pointer; font: 600 11px Inter, sans-serif; }
-.graph-button:disabled { cursor: default; opacity: .5; }
+.graph-button, .history-button { padding: 5px 9px; border-radius: 6px; cursor: pointer; font: 600 11px Inter, sans-serif; }
+.graph-button { color: #5f5ab9; background: #f2f1ff; border: 1px solid #deddff; }
+.history-button { color: #5d5964; background: #fff; border: 1px solid #dedce0; }
+.graph-button:disabled, .history-button:disabled { cursor: default; opacity: .5; }
+.history-button:hover:not(:disabled) { color: #5f5ab9; border-color: #bdb9e4; }
 .breadcrumb { display: flex; min-width: 0; gap: 8px; color: #97949a; overflow: hidden; font-size: 12px; }
 .breadcrumb strong { color: #3d3c42; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .breadcrumb b { color: #b5b2b8; font-weight: 400; }
@@ -157,6 +160,23 @@ kbd, .search-shortcut { padding: 1px 4px; color: #9e9ba1; background: #fff; bord
 .portal-picker > div { display: flex; justify-content: flex-end; gap: 6px; height: auto; margin-top: 10px; }
 .portal-picker button { padding: 5px 8px; color: #4e4b54; background: #fff; border: 1px solid #dedce0; border-radius: 5px; font: 600 11px Inter, sans-serif; }
 .portal-picker button:last-child { color: #fff; background: #6965db; border-color: #6965db; }
+.history-panel { position: absolute; z-index: 4; top: 73px; right: 14px; bottom: 14px; display: flex; width: 310px; flex-direction: column; padding: 13px; color: #4e4b54; background: rgba(255, 255, 255, .98); border: 1px solid #dedce0; border-radius: 9px; box-shadow: 0 10px 32px rgba(0, 0, 0, .16); }
+.history-panel > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.history-panel header p { margin: 0 0 3px; color: #908c96; font-size: 9px; font-weight: 700; letter-spacing: .1em; }
+.history-panel header h2 { max-width: 230px; margin: 0; overflow: hidden; color: #39363e; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.history-panel header button { padding: 0 4px; color: #918d96; background: transparent; border: 0; font-size: 20px; line-height: 1; }
+.history-preview { display: grid; min-height: 130px; place-items: center; margin: 13px 0 9px; overflow: hidden; color: #94909a; background: #f7f6f8; border: 1px solid #e6e3e8; border-radius: 6px; font-size: 11px; }
+.history-preview img { display: block; width: 100%; height: 150px; object-fit: contain; }
+.history-version-list { min-height: 0; flex: 1; overflow: auto; border-top: 1px solid #ece9ed; }
+.history-version-list button { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 8px 7px; color: #56535b; text-align: left; background: transparent; border: 0; border-bottom: 1px solid #f0eef1; font-size: 11px; }
+.history-version-list button:hover, .history-version-list button.is-selected { color: #49458c; background: #f0efff; }
+.history-version-list button small { color: #97939b; font-size: 10px; }
+.history-restore { margin-top: 11px; padding: 8px 10px; color: #fff; background: #6965db; border: 1px solid #5f5bcb; border-radius: 6px; font: 600 11px Inter, sans-serif; }
+.history-restore:hover:not(:disabled) { background: #5f5bcb; }
+.history-help, .history-empty span { margin: 8px 1px 0; color: #928e97; font-size: 10px; line-height: 1.45; }
+.history-empty { display: grid; gap: 5px; margin: auto 0; padding: 15px 5px; color: #66626b; text-align: center; font-size: 12px; }
+.history-empty span { margin: 0; }
+.history-error { margin: 8px 0 0; color: #a54b4f; font-size: 10px; }
 .backlinks-panel { position: absolute; z-index: 2; right: 14px; bottom: 74px; display: grid; gap: 5px; width: 190px; padding: 10px; background: rgba(255, 255, 255, .96); border: 1px solid #dedce0; border-radius: 8px; box-shadow: 0 5px 18px rgba(0, 0, 0, .1); }
 .backlinks-panel p { margin: 0 0 2px; color: #8d8992; font-size: 9px; font-weight: 700; letter-spacing: .1em; }
 .backlinks-panel button { overflow: hidden; padding: 4px; color: #54515a; background: transparent; border: 0; border-radius: 4px; cursor: pointer; font: 500 11px Inter, sans-serif; text-align: left; text-overflow: ellipsis; white-space: nowrap; }

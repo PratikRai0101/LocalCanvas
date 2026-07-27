@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SaveStatus } from "../src/canvas/Canvas";
 import type { DrawingSummary, LibraryState } from "../src/library/api";
@@ -15,6 +15,9 @@ const libraryApi = vi.hoisted(() => ({
   getBacklinks: vi.fn(),
   readScene: vi.fn(),
   writeScene: vi.fn(),
+  listSceneVersions: vi.fn(),
+  readSceneVersion: vi.fn(),
+  restoreSceneVersion: vi.fn(),
   pickImportScene: vi.fn(),
   recordDrawingOpened: vi.fn(),
   setDrawingPinned: vi.fn(),
@@ -79,6 +82,8 @@ describe("App autosave wiring", () => {
     libraryApi.getState.mockReset();
     libraryApi.getBacklinks.mockReset();
     libraryApi.pickImportScene.mockReset();
+    libraryApi.listSceneVersions.mockReset();
+    libraryApi.restoreSceneVersion.mockReset();
     libraryApi.recordDrawingOpened.mockReset();
     libraryApi.setDrawingPinned.mockReset();
     libraryApi.createDrawing.mockReset();
@@ -91,6 +96,7 @@ describe("App autosave wiring", () => {
     libraryApi.moveFolder.mockReset();
     libraryApi.getState.mockResolvedValue(library);
     libraryApi.getBacklinks.mockResolvedValue([]);
+    libraryApi.listSceneVersions.mockResolvedValue([]);
     libraryApi.recordDrawingOpened.mockResolvedValue(undefined);
   });
 
@@ -132,6 +138,17 @@ describe("App autosave wiring", () => {
     fireEvent.click(screen.getByRole("button", { name: "Rename" }));
 
     await waitFor(() => expect(libraryApi.renameDrawing).toHaveBeenCalledWith("test.excalidraw", "renamed"));
+  });
+
+  it("opens version history after flushing the active canvas", async () => {
+    const { container } = render(<App />);
+    const app = within(container);
+
+    fireEvent.click(await app.findByTitle("test.excalidraw"));
+    fireEvent.click(await app.findByRole("button", { name: "History" }));
+
+    await waitFor(() => expect(libraryApi.listSceneVersions).toHaveBeenCalledWith("test.excalidraw"));
+    expect(await app.findByLabelText("Version history")).toBeTruthy();
   });
 
   it("opens the command palette with Cmd+K even when the search field has focus", async () => {

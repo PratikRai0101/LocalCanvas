@@ -24,6 +24,7 @@ type CanvasProps = {
   drawingTitle: string;
   onSaveStatus: (status: SaveStatus) => void;
   onSaved: () => void;
+  onAutosaveController?: (controller: { flush: () => Promise<void> } | null) => void;
   portalTargets: DrawingSummary[];
   onOpenPortal: (target: PortalLink) => void;
 };
@@ -44,6 +45,7 @@ export function Canvas({
   drawingTitle,
   onSaveStatus,
   onSaved,
+  onAutosaveController,
   portalTargets,
   onOpenPortal,
 }: CanvasProps) {
@@ -150,15 +152,26 @@ export function Canvas({
     };
   }, [drawingPath, onSaveStatus]);
 
+  const flushAutosave = useCallback(async () => {
+    if (saveTimer.current !== null) {
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    await saveLatestScene();
+  }, [saveLatestScene]);
+
+  useEffect(() => {
+    onAutosaveController?.({ flush: flushAutosave });
+    return () => onAutosaveController?.(null);
+  }, [flushAutosave, onAutosaveController]);
+
   useEffect(
     () => () => {
       if (saveTimer.current !== null) {
-        window.clearTimeout(saveTimer.current);
-        saveTimer.current = null;
-        void saveLatestScene();
+        void flushAutosave();
       }
     },
-    [saveLatestScene],
+    [flushAutosave],
   );
 
   const insertNativeDroppedImage = useCallback(async (path: string, clientX: number, clientY: number) => {
