@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { CommandPalette } from "../src/search/CommandPalette";
 
-const drawing = { path: "Architecture/auth-flow.excalidraw", title: "auth-flow", modifiedAt: 0 };
+const drawing = { path: "Architecture/auth-flow.excalidraw", title: "auth-flow", modifiedAt: 0, tags: [] };
 
 describe("CommandPalette", () => {
   it("filters drawings and opens the highlighted result with Enter", () => {

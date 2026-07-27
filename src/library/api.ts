@@ -4,6 +4,7 @@ export type DrawingSummary = {
   path: string;
   title: string;
   modifiedAt: number;
+  tags: string[];
 };
 
 export type FolderSummary = {

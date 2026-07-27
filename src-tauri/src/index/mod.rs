@@ -105,6 +105,7 @@ pub fn search(root: &Path, query: &str) -> CommandResult<Vec<DrawingSummary>> {
                 path: row.get(0)?,
                 title: row.get(1)?,
                 modified_at: modified_at.parse().unwrap_or_default(),
+                tags: Vec::new(),
             })
         })
         .map_err(|error| format!("Couldn't run search: {error}"))?

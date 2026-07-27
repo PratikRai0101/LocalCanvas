@@ -59,6 +59,7 @@ const drawing: DrawingSummary = {
   path: "test.excalidraw",
   title: "test",
   modifiedAt: 0,
+  tags: [],
 };
 
 const library: LibraryState = {

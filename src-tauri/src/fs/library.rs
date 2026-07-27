@@ -24,6 +24,7 @@ pub struct DrawingSummary {
     pub path: String,
     pub title: String,
     pub modified_at: u128,
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -207,14 +208,7 @@ pub fn create_folder(
 pub fn drawing_tags(app: &AppHandle, relative_path: &str) -> CommandResult<Vec<String>> {
     let root = active_library_root(app)?;
     let path = resolve_existing_drawing_path(&root, relative_path)?;
-    let Some(encoded) = xattr::get(path, FINDER_TAG_ATTRIBUTE)
-        .map_err(|error| format!("Couldn't read Finder tags: {error}"))?
-    else {
-        return Ok(Vec::new());
-    };
-    let tags = plist::from_bytes::<Vec<String>>(&encoded)
-        .map_err(|error| format!("Couldn't read Finder tags: {error}"))?;
-    Ok(tags.into_iter().map(strip_finder_tag_color).collect())
+    read_finder_tags(&path)
 }
 
 pub fn set_drawing_tags(
@@ -414,6 +408,7 @@ fn drawing_summary(root: &Path, path: &Path) -> CommandResult<DrawingSummary> {
         path: relative_path(root, path)?,
         title,
         modified_at,
+        tags: read_finder_tags(path)?,
     })
 }
 
@@ -533,6 +528,17 @@ fn folder_name(name: &str) -> CommandResult<String> {
     let name = name.trim();
     validate_name(name, "Folder name")?;
     Ok(name.to_owned())
+}
+
+fn read_finder_tags(path: &Path) -> CommandResult<Vec<String>> {
+    let Some(encoded) = xattr::get(path, FINDER_TAG_ATTRIBUTE)
+        .map_err(|error| format!("Couldn't read Finder tags: {error}"))?
+    else {
+        return Ok(Vec::new());
+    };
+    let tags = plist::from_bytes::<Vec<String>>(&encoded)
+        .map_err(|error| format!("Couldn't read Finder tags: {error}"))?;
+    Ok(tags.into_iter().map(strip_finder_tag_color).collect())
 }
 
 fn normalize_tags(tags: Vec<String>) -> CommandResult<Vec<String>> {
