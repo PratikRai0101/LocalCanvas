@@ -132,6 +132,9 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 
 .workspace { position: relative; display: flex; min-width: 0; flex: 1; flex-direction: column; overflow: hidden; background: #fefefe; }
 .workspace-header { display: flex; align-items: center; justify-content: space-between; flex: 0 0 58px; gap: 20px; padding: 0 24px; border-bottom: 1px solid #ecebed; background: rgba(255, 255, 255, .94); }
+.workspace-actions { display: flex; align-items: center; gap: 8px; }
+.graph-button { padding: 5px 9px; color: #5f5ab9; background: #f2f1ff; border: 1px solid #deddff; border-radius: 6px; cursor: pointer; font: 600 11px Inter, sans-serif; }
+.graph-button:disabled { cursor: default; opacity: .5; }
 .breadcrumb { display: flex; min-width: 0; gap: 8px; color: #97949a; overflow: hidden; font-size: 12px; }
 .breadcrumb strong { color: #3d3c42; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .breadcrumb b { color: #b5b2b8; font-weight: 400; }
@@ -156,6 +159,19 @@ kbd { padding: 1px 4px; color: #9e9ba1; background: #fff; border: 1px solid #e4e
 .backlinks-panel p { margin: 0 0 2px; color: #8d8992; font-size: 9px; font-weight: 700; letter-spacing: .1em; }
 .backlinks-panel button { overflow: hidden; padding: 4px; color: #54515a; background: transparent; border: 0; border-radius: 4px; cursor: pointer; font: 500 11px Inter, sans-serif; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
 .backlinks-panel button:hover { color: #5f5ab9; background: #f2f1ff; }
+.graph-view { display: flex; min-height: 0; flex: 1; flex-direction: column; padding: 26px; background: radial-gradient(circle at 50% 30%, #f1f0ff, transparent 46%), #fbfbfc; }
+.graph-view > header { display: flex; align-items: center; justify-content: space-between; }
+.graph-view h1 { margin: 0; color: #34323a; font-size: 22px; letter-spacing: -.5px; }
+.graph-view > header button { padding: 6px 10px; color: #5d5964; background: #fff; border: 1px solid #dedce0; border-radius: 6px; cursor: pointer; font: 600 11px Inter, sans-serif; }
+.graph-view svg { width: 100%; min-height: 0; flex: 1; margin-top: 14px; }
+.graph-links line { stroke: #cac7eb; stroke-width: 1.5; }
+.graph-nodes g { cursor: pointer; outline: none; }
+.graph-nodes circle { fill: #6965db; stroke: #fff; stroke-width: 3; transition: transform .15s ease, fill .15s ease; }
+.graph-nodes g:hover circle, .graph-nodes g:focus circle { fill: #4e49bd; }
+.graph-nodes text { fill: #504d56; font: 600 12px Inter, sans-serif; pointer-events: none; text-anchor: middle; }
+.graph-empty { display: grid; flex: 1; place-content: center; color: #86828a; text-align: center; }
+.graph-empty h1 { margin-bottom: 8px; }
+.graph-empty p { margin: 0; font-size: 13px; }
 .canvas-message { display: grid; flex: 1; place-content: center; gap: 7px; color: #96939a; background: #fafafa; font-size: 13px; text-align: center; }
 .canvas-message-error { color: #ae4c50; }
 .canvas-message-error span { max-width: 500px; color: #837d82; font-size: 12px; }

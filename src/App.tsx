@@ -5,11 +5,13 @@ import { Canvas, SaveStatus } from "./canvas/Canvas";
 import {
   DrawingSummary,
   FolderSummary,
+  GraphData,
   LibraryState,
   libraryApi,
 } from "./library/api";
 import { ThumbnailGrid } from "./library/ThumbnailGrid";
 import { CommandPalette } from "./search/CommandPalette";
+import { GraphView } from "./graph/GraphView";
 import "./App.css";
 
 type DialogKind = "drawing" | "folder" | null;
@@ -42,6 +44,8 @@ function App() {
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<DrawingSummary[] | null>(null);
   const [backlinks, setBacklinks] = useState<DrawingSummary[]>([]);
+  const [isGraphOpen, setIsGraphOpen] = useState(false);
+  const [graph, setGraph] = useState<GraphData | null>(null);
   const handleSaveStatus = useCallback((status: SaveStatus) => {
     if (status === "error") {
       setError("Couldn’t save this drawing. Your latest changes may not be on disk.");
@@ -299,6 +303,7 @@ function App() {
   function selectDrawing(drawing: DrawingSummary) {
     setActiveDrawing(drawing);
     setSelectedFolderPath(parentPath(drawing.path));
+    setIsGraphOpen(false);
     handleSaveStatus("saved");
     setError(null);
     void libraryApi.recordDrawingOpened(drawing.path)
@@ -317,6 +322,16 @@ function App() {
       await refreshLibrary();
     } catch (cause) {
       setError(asMessage(cause, "Couldn’t update the pinned drawing."));
+    }
+  }
+
+  async function openGraph() {
+    try {
+      setGraph(await libraryApi.getGraph());
+      setIsGraphOpen(true);
+      setError(null);
+    } catch (cause) {
+      setError(asMessage(cause, "Couldn’t load the drawing graph."));
     }
   }
 
@@ -637,7 +652,9 @@ function App() {
             <span>{activeDrawing ? activeFolderLabel : "LocalCanvas"}</span>
             {activeDrawing && <><b>/</b><strong>{activeDrawing.title}</strong></>}
           </div>
-          <label className="search-box">
+          <div className="workspace-actions">
+            <button className="graph-button" type="button" onClick={() => void openGraph()} disabled={!library.root}>Graph</button>
+            <label className="search-box">
             <span>⌕</span>
             <input
               value={query}
@@ -646,7 +663,8 @@ function App() {
               aria-label="Search drawing titles and paths"
             />
             <kbd>⌘K</kbd>
-          </label>
+            </label>
+          </div>
         </header>
 
         {error && (
@@ -659,6 +677,8 @@ function App() {
 
         {!library.root ? (
           <Welcome onChoose={() => void chooseLibraryRoot()} isChoosing={isChoosingRoot} />
+        ) : isGraphOpen && graph ? (
+          <GraphView graph={graph} onOpenDrawing={openPortal} onClose={() => setIsGraphOpen(false)} />
         ) : activeDrawing ? (
           <>
             <Canvas

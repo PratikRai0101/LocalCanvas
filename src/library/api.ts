@@ -26,6 +26,11 @@ export type ImportedScene = {
   contents: number[];
 };
 
+export type GraphData = {
+  nodes: Array<{ id: string; path: string; title: string }>;
+  edges: Array<{ sourceId: string; targetId: string }>;
+};
+
 export const libraryApi = {
   getState: () => invoke<LibraryState>("get_library_state"),
   chooseRoot: () => invoke<LibraryState>("choose_library_root"),
@@ -33,6 +38,7 @@ export const libraryApi = {
     invoke<DrawingSummary[]>("search_drawings", { query }),
   getBacklinks: (relativePath: string) =>
     invoke<DrawingSummary[]>("get_backlinks", { relativePath }),
+  getGraph: () => invoke<GraphData>("get_graph"),
   recordDrawingOpened: (relativePath: string) =>
     invoke<void>("record_drawing_opened", { relativePath }),
   setDrawingPinned: (relativePath: string, pinned: boolean) =>

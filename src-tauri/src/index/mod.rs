@@ -22,6 +22,28 @@ pub struct IndexStats {
     pub indexed_text_elements: usize,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphNode {
+    pub id: String,
+    pub path: String,
+    pub title: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphEdge {
+    pub source_id: String,
+    pub target_id: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphData {
+    pub nodes: Vec<GraphNode>,
+    pub edges: Vec<GraphEdge>,
+}
+
 pub fn rebuild(root: &Path) -> CommandResult<IndexStats> {
     let entries = scan_drawings(root)?;
     let drawing_count = entries.len();
@@ -78,6 +100,44 @@ pub fn rebuild(root: &Path) -> CommandResult<IndexStats> {
         drawing_count,
         indexed_text_elements,
     })
+}
+
+pub fn graph(root: &Path) -> CommandResult<GraphData> {
+    let database_path = root.join(CACHE_DIRECTORY).join(DATABASE_FILE);
+    if !database_path.exists() {
+        rebuild(root)?;
+    }
+    let connection = Connection::open(&database_path)
+        .map_err(|error| format!("Couldn't open search index: {error}"))?;
+    let mut node_statement = connection
+        .prepare("SELECT id, path, title FROM drawings ORDER BY title COLLATE NOCASE")
+        .map_err(|error| format!("Couldn't prepare graph query: {error}"))?;
+    let nodes = node_statement
+        .query_map([], |row| Ok(GraphNode {
+            id: row.get(0)?,
+            path: row.get(1)?,
+            title: row.get(2)?,
+        }))
+        .map_err(|error| format!("Couldn't query graph nodes: {error}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("Couldn't read graph nodes: {error}"))?;
+    let mut edge_statement = connection
+        .prepare(
+            "SELECT links.source_id, links.target_id
+             FROM links
+             JOIN drawings AS source ON source.id = links.source_id
+             JOIN drawings AS target ON target.id = links.target_id",
+        )
+        .map_err(|error| format!("Couldn't prepare graph links: {error}"))?;
+    let edges = edge_statement
+        .query_map([], |row| Ok(GraphEdge {
+            source_id: row.get(0)?,
+            target_id: row.get(1)?,
+        }))
+        .map_err(|error| format!("Couldn't query graph links: {error}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("Couldn't read graph links: {error}"))?;
+    Ok(GraphData { nodes, edges })
 }
 
 pub fn backlinks(root: &Path, relative_path: &str) -> CommandResult<Vec<DrawingSummary>> {
@@ -345,7 +405,7 @@ fn content_hash(contents: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{backlinks, rebuild, search};
+    use super::{backlinks, graph, rebuild, search};
     use std::{env, fs};
     use uuid::Uuid;
 
@@ -399,6 +459,11 @@ mod tests {
         let results = backlinks(&root, "target.excalidraw").expect("query backlinks");
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].path, "source.excalidraw");
+        let graph = graph(&root).expect("query graph");
+        assert_eq!(graph.nodes.len(), 2);
+        assert_eq!(graph.edges.len(), 1);
+        assert_eq!(graph.edges[0].source_id, "source-id");
+        assert_eq!(graph.edges[0].target_id, "target-id");
 
         fs::remove_dir_all(root).expect("remove test library");
     }

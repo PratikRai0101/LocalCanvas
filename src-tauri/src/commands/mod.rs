@@ -1,6 +1,6 @@
 use crate::{
     fs::library::{self, CommandResult, DrawingSummary, FolderSummary, LibraryState},
-    index::{self, IndexStats},
+    index::{self, GraphData, IndexStats},
 };
 use serde::Serialize;
 use std::{fs, path::PathBuf};
@@ -66,6 +66,11 @@ pub fn rebuild_index(app: AppHandle) -> CommandResult<IndexStats> {
 #[tauri::command]
 pub fn search_drawings(app: AppHandle, query: String) -> CommandResult<Vec<DrawingSummary>> {
     index::search(&library::active_library_root(&app)?, &query)
+}
+
+#[tauri::command]
+pub fn get_graph(app: AppHandle) -> CommandResult<GraphData> {
+    index::graph(&library::active_library_root(&app)?)
 }
 
 #[tauri::command]
