@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { clientPositionInCanvas, isSupportedImagePath } from "../src/canvas/nativeImageDrop";
 
 describe("native image drops", () => {
-  it("converts a native physical drop position into a canvas client position", () => {
+  it("uses WKWebView's native logical drop position as the canvas client position", () => {
     const position = clientPositionInCanvas(
       { x: 800, y: 520 },
       { x: 0, y: 56 },
@@ -10,7 +10,7 @@ describe("native image drops", () => {
       { left: 150, top: 80, right: 900, bottom: 600 },
     );
 
-    expect(position).toEqual({ x: 400, y: 232 });
+    expect(position).toEqual({ x: 800, y: 520 });
   });
 
   it("accepts image paths that Tauri reports without a browser MIME type", () => {
