@@ -1,11 +1,20 @@
-use crate::fs::library::{self, CommandResult, DrawingSummary, FolderSummary, LibraryState};
+use crate::{
+    fs::library::{self, CommandResult, DrawingSummary, FolderSummary, LibraryState},
+    index::{self, IndexStats},
+};
 use std::path::PathBuf;
 use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
 
 #[tauri::command]
 pub fn get_library_state(app: AppHandle) -> CommandResult<LibraryState> {
-    library::get_library_state(&app)
+    let state = library::get_library_state(&app)?;
+    if let Ok(root) = library::active_library_root(&app) {
+        // A broken cache must never prevent library browsing. Search reports an
+        // actionable error if it cannot rebuild its derived index later.
+        let _ = index::rebuild(&root);
+    }
+    Ok(state)
 }
 
 #[tauri::command]
@@ -17,13 +26,27 @@ pub async fn choose_library_root(app: AppHandle) -> CommandResult<LibraryState> 
         .blocking_pick_folder();
 
     let Some(selected) = selected else {
-        return library::get_library_state(&app);
+        return get_library_state(app);
     };
 
     let path: PathBuf = selected
         .into_path()
         .map_err(|error| format!("Couldn't use the selected folder: {error}"))?;
-    library::set_library_root(&app, path)
+    let state = library::set_library_root(&app, path)?;
+    if let Ok(root) = library::active_library_root(&app) {
+        let _ = index::rebuild(&root);
+    }
+    Ok(state)
+}
+
+#[tauri::command]
+pub fn rebuild_index(app: AppHandle) -> CommandResult<IndexStats> {
+    index::rebuild(&library::active_library_root(&app)?)
+}
+
+#[tauri::command]
+pub fn search_drawings(app: AppHandle, query: String) -> CommandResult<Vec<DrawingSummary>> {
+    index::search(&library::active_library_root(&app)?, &query)
 }
 
 #[tauri::command]

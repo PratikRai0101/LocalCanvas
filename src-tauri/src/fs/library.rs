@@ -84,14 +84,14 @@ pub fn set_library_root(app: &AppHandle, root: PathBuf) -> CommandResult<Library
 }
 
 pub fn read_scene(app: &AppHandle, relative_path: &str) -> CommandResult<String> {
-    let root = required_library_root(app)?;
+    let root = active_library_root(app)?;
     let path = resolve_existing_drawing_path(&root, relative_path)?;
 
     fs::read_to_string(&path).map_err(|error| format!("Couldn't read drawing: {error}"))
 }
 
 pub fn write_scene(app: &AppHandle, relative_path: &str, scene_json: &str) -> CommandResult<()> {
-    let root = required_library_root(app)?;
+    let root = active_library_root(app)?;
     let path = resolve_existing_drawing_path(&root, relative_path)?;
     validate_excalidraw_scene(scene_json)?;
     atomic_write(&path, scene_json.as_bytes())
@@ -102,7 +102,7 @@ pub fn create_drawing(
     parent_path: &str,
     title: &str,
 ) -> CommandResult<DrawingSummary> {
-    let root = required_library_root(app)?;
+    let root = active_library_root(app)?;
     let parent = resolve_directory_path(&root, parent_path)?;
     let file_name = drawing_file_name(title)?;
     let path = unique_path(&parent, &file_name);
@@ -119,7 +119,7 @@ pub fn create_folder(
     parent_path: &str,
     name: &str,
 ) -> CommandResult<FolderSummary> {
-    let root = required_library_root(app)?;
+    let root = active_library_root(app)?;
     let parent = resolve_directory_path(&root, parent_path)?;
     let name = folder_name(name)?;
     let folder = parent.join(name);
@@ -218,7 +218,7 @@ fn load_library_root(app: &AppHandle) -> CommandResult<Option<PathBuf>> {
     Ok(settings.library_root)
 }
 
-fn required_library_root(app: &AppHandle) -> CommandResult<PathBuf> {
+pub fn active_library_root(app: &AppHandle) -> CommandResult<PathBuf> {
     let root = load_library_root(app)?
         .ok_or_else(|| "Choose a LocalCanvas library folder first.".to_owned())?;
     let canonical_root = root
