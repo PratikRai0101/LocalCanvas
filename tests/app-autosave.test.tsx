@@ -134,6 +134,15 @@ describe("App autosave wiring", () => {
     await waitFor(() => expect(libraryApi.renameDrawing).toHaveBeenCalledWith("test.excalidraw", "renamed"));
   });
 
+  it("opens the command palette with Cmd+K even when the search field has focus", async () => {
+    render(<App />);
+
+    const search = (await screen.findAllByRole("textbox", { name: "Search drawing titles and paths" })).at(-1)!;
+    fireEvent.keyDown(search, { key: "k", metaKey: true });
+
+    expect((await screen.findAllByRole("dialog", { name: "Command palette" })).at(-1)).toBeTruthy();
+  });
+
   it("offers a destructive action instead of the WebView context menu", async () => {
     libraryApi.deleteDrawing.mockResolvedValue(undefined);
     vi.spyOn(window, "confirm").mockReturnValue(true);

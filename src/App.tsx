@@ -382,6 +382,23 @@ function App() {
   function browseFolder(path: string) {
     setSelectedFolderPath(path);
     setActiveDrawing(null);
+    setIsGraphOpen(false);
+  }
+
+  function browseTag(tag: string) {
+    setSelectedTag(tag);
+    setSelectedFolderPath("");
+    setActiveDrawing(null);
+    setIsGraphOpen(false);
+    setQuery("");
+  }
+
+  function showAllDrawings() {
+    setSelectedTag(null);
+    setSelectedFolderPath("");
+    setActiveDrawing(null);
+    setIsGraphOpen(false);
+    setQuery("");
   }
 
   function openContextMenu(
@@ -466,6 +483,12 @@ function App() {
       if (!(event.metaKey || event.ctrlKey) || event.altKey) {
         return;
       }
+      if (event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setIsCommandPaletteOpen(true);
+        return;
+      }
+
       const target = event.target as HTMLElement | null;
       if (target?.matches("input, textarea, select, [contenteditable='true']")) {
         return;
@@ -474,10 +497,6 @@ function App() {
       if (event.key.toLowerCase() === "n" && library.root) {
         event.preventDefault();
         openDialog(event.shiftKey ? "folder" : "drawing");
-      }
-      if (event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setIsCommandPaletteOpen(true);
       }
       if (event.key.toLowerCase() === "o" && library.root) {
         event.preventDefault();
@@ -694,10 +713,16 @@ function App() {
             <input
               value={query}
               onChange={(event) => setQuery(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+                  event.preventDefault();
+                  setIsCommandPaletteOpen(true);
+                }
+              }}
               placeholder="Search drawings"
               aria-label="Search drawing titles and paths"
             />
-            <kbd>⌘K</kbd>
+            <button type="button" className="search-shortcut" onClick={() => setIsCommandPaletteOpen(true)} aria-label="Open command palette">⌘K</button>
             </label>
           </div>
         </header>
@@ -754,8 +779,14 @@ function App() {
         <CommandPalette
           drawings={library.drawings}
           folders={library.folders}
+          tags={libraryTags}
+          isGraphOpen={isGraphOpen}
           onOpenDrawing={selectDrawing}
           onOpenFolder={browseFolder}
+          onOpenTag={browseTag}
+          onOpenGraph={() => void openGraph()}
+          onCloseGraph={() => setIsGraphOpen(false)}
+          onShowAllDrawings={showAllDrawings}
           onNewDrawing={() => openDialog("drawing")}
           onNewFolder={() => openDialog("folder")}
           onImportDrawing={() => void importExistingDrawing()}

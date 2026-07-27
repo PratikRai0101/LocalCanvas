@@ -26,7 +26,7 @@ pub fn run() {
             let rename = MenuItemBuilder::with_id("rename-active", "Rename")
                 .accelerator("CmdOrCtrl+R")
                 .build(app)?;
-            let command_palette = MenuItemBuilder::with_id("command-palette", "Search Drawings")
+            let command_palette = MenuItemBuilder::with_id("command-palette", "Command Palette…")
                 .accelerator("CmdOrCtrl+K")
                 .build(app)?;
 
