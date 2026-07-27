@@ -54,3 +54,11 @@ Status: Accepted
 Context: Full-text search needs an index before the portal feature introduces durable drawing UUIDs. Persisting a UUID only in SQLite or a sidecar would violate the rule that the index is fully rebuildable from drawing files.
 Decision: The search-only SQLite index derives its internal `drawings.id` from the drawing's current relative path. It is a cache key only, never exposed as a durable drawing identity and never used for portal links. The portal slice must introduce a durable source-of-truth UUID in element `customData` before writing `links` rows.
 Consequences: Search remains correct after a rename because the index is rebuilt from disk, while backlinks and portal navigation deliberately remain unavailable until durable IDs exist. No identity metadata is added to scene-level JSON.
+
+## ADR-006: Store a drawing UUID in a transparent, locked Excalidraw metadata element
+
+Date: 2026-07-27
+Status: Accepted
+Context: Portals need a durable target identity that survives file moves and lets the rebuildable index resolve IDs to current paths. A SQLite-only ID or sidecar would violate the filesystem-source-of-truth invariant, while custom scene-level fields violate format compatibility requirements. Deleted elements are discarded by Excalidraw's restore path, so cannot carry this metadata.
+Decision: On first open, add a normal zero-opacity, locked Excalidraw rectangle whose `customData.localcanvas` payload has `kind: "drawing-metadata"` and a UUID. It is invisible in compatible Excalidraw consumers and survives their standard serialize/restore path.
+Consequences: Opening a legacy drawing performs one atomic migration write. The ID stays in the portable drawing file, so the SQLite index can always be rebuilt and links can survive renames and moves. The marker is an implementation detail and must never be exposed as a user-facing canvas element.

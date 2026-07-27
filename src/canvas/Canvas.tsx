@@ -12,6 +12,7 @@ import type {
 } from "@excalidraw/excalidraw/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { libraryApi } from "../library/api";
+import { ensureDrawingIdentity } from "./portalMetadata";
 
 type CanvasProps = {
   drawingPath: string;
@@ -84,8 +85,15 @@ export function Canvas({
           null,
           null,
         );
+        const identity = ensureDrawingIdentity(restored.elements);
+        if (identity.wasCreated) {
+          await libraryApi.writeScene(
+            drawingPath,
+            serializeAsJSON(identity.elements, restored.appState, restored.files, "local"),
+          );
+        }
         if (!cancelled) {
-          setInitialData(restored);
+          setInitialData({ ...restored, elements: identity.elements });
           onSaveStatus("saved");
         }
       } catch (error) {
