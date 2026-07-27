@@ -7,11 +7,13 @@ type HistoryPanelProps = {
   drawingPath: string;
   drawingTitle: string;
   versions: SceneVersion[];
+  historyEnabled: boolean;
+  onHistoryEnabledChange: (enabled: boolean) => Promise<void>;
   onRestore: (version: SceneVersion) => Promise<void>;
   onClose: () => void;
 };
 
-export function HistoryPanel({ drawingPath, drawingTitle, versions, onRestore, onClose }: HistoryPanelProps) {
+export function HistoryPanel({ drawingPath, drawingTitle, versions, historyEnabled, onHistoryEnabledChange, onRestore, onClose }: HistoryPanelProps) {
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(versions[0]?.id ?? null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
@@ -74,7 +76,20 @@ export function HistoryPanel({ drawingPath, drawingTitle, versions, onRestore, o
         </div>
         <button type="button" onClick={onClose} aria-label="Close version history">×</button>
       </header>
-      {!versions.length ? (
+      <label className="history-setting">
+        <input
+          type="checkbox"
+          checked={historyEnabled}
+          onChange={(event) => void onHistoryEnabledChange(event.currentTarget.checked)}
+        />
+        Save recovery versions
+      </label>
+      {!historyEnabled ? (
+        <div className="history-empty">
+          <strong>Version history is off</strong>
+          <span>Your canvas still autosaves. Turn this on to keep recovery versions for future changes.</span>
+        </div>
+      ) : !versions.length ? (
         <div className="history-empty">
           <strong>No saved versions yet</strong>
           <span>Versions appear after your next canvas change is autosaved.</span>

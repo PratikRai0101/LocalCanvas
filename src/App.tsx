@@ -32,6 +32,7 @@ const EMPTY_LIBRARY: LibraryState = {
   folders: [],
   recentPaths: [],
   pinnedPaths: [],
+  historyEnabled: true,
 };
 
 function App() {
@@ -364,6 +365,19 @@ function App() {
       setError(asMessage(cause, "Couldn’t load version history."));
     } finally {
       setIsLoadingHistory(false);
+    }
+  }
+
+  async function setHistoryEnabled(enabled: boolean) {
+    try {
+      await libraryApi.setHistoryEnabled(enabled);
+      await refreshLibrary();
+      if (enabled && activeDrawing) {
+        setVersions(await libraryApi.listSceneVersions(activeDrawing.path));
+      }
+      setError(null);
+    } catch (cause) {
+      setError(asMessage(cause, "Couldn’t update version history settings."));
     }
   }
 
@@ -798,6 +812,8 @@ function App() {
                 drawingPath={activeDrawing.path}
                 drawingTitle={activeDrawing.title}
                 versions={versions}
+                historyEnabled={library.historyEnabled}
+                onHistoryEnabledChange={setHistoryEnabled}
                 onRestore={restoreVersion}
                 onClose={() => setIsHistoryOpen(false)}
               />

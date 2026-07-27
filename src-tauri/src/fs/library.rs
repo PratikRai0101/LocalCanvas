@@ -53,14 +53,31 @@ pub struct LibraryState {
     pub folders: Vec<FolderSummary>,
     pub recent_paths: Vec<String>,
     pub pinned_paths: Vec<String>,
+    pub history_enabled: bool,
 }
 
-#[derive(Debug, Deserialize, Serialize, Default)]
+fn history_enabled_by_default() -> bool {
+    true
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 struct LibraryPreferences {
     #[serde(default)]
     recent_paths: Vec<String>,
     #[serde(default)]
     pinned_paths: Vec<String>,
+    #[serde(default = "history_enabled_by_default")]
+    history_enabled: bool,
+}
+
+impl Default for LibraryPreferences {
+    fn default() -> Self {
+        Self {
+            recent_paths: Vec::new(),
+            pinned_paths: Vec::new(),
+            history_enabled: true,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, Default)]
@@ -79,6 +96,7 @@ pub fn get_library_state(app: &AppHandle) -> CommandResult<LibraryState> {
             folders: Vec::new(),
             recent_paths: Vec::new(),
             pinned_paths: Vec::new(),
+            history_enabled: true,
         }),
         None => Ok(LibraryState {
             root: None,
@@ -86,6 +104,7 @@ pub fn get_library_state(app: &AppHandle) -> CommandResult<LibraryState> {
             folders: Vec::new(),
             recent_paths: Vec::new(),
             pinned_paths: Vec::new(),
+            history_enabled: true,
         }),
     }
 }
@@ -144,6 +163,17 @@ pub fn set_drawing_pinned(app: &AppHandle, relative_path: &str, pinned: bool) ->
     save_settings(app, &settings)
 }
 
+pub fn set_history_enabled(app: &AppHandle, enabled: bool) -> CommandResult<()> {
+    let root = active_library_root(app)?;
+    let mut settings = load_settings(app)?;
+    settings
+        .preferences
+        .entry(path_to_string(&root))
+        .or_default()
+        .history_enabled = enabled;
+    save_settings(app, &settings)
+}
+
 pub fn read_scene(app: &AppHandle, relative_path: &str) -> CommandResult<String> {
     let root = active_library_root(app)?;
     let path = resolve_existing_drawing_path(&root, relative_path)?;
@@ -153,7 +183,12 @@ pub fn read_scene(app: &AppHandle, relative_path: &str) -> CommandResult<String>
 
 pub fn write_scene(app: &AppHandle, relative_path: &str, scene_json: &str) -> CommandResult<()> {
     let root = active_library_root(app)?;
-    write_scene_at(&root, relative_path, scene_json)
+    let history_enabled = load_settings(app)?
+        .preferences
+        .get(&path_to_string(&root))
+        .map(|preferences| preferences.history_enabled)
+        .unwrap_or(true);
+    write_scene_at(&root, relative_path, scene_json, history_enabled)
 }
 
 pub fn list_scene_versions(
@@ -182,17 +217,44 @@ pub fn restore_scene_version(
     restore_version_at(&root, relative_path, version_id)
 }
 
-fn write_scene_at(root: &Path, relative_path: &str, scene_json: &str) -> CommandResult<()> {
+fn write_scene_at(
+    root: &Path,
+    relative_path: &str,
+    scene_json: &str,
+    history_enabled: bool,
+) -> CommandResult<()> {
     let path = resolve_existing_drawing_path(root, relative_path)?;
     validate_excalidraw_scene(scene_json)?;
     let existing_scene =
         fs::read(&path).map_err(|error| format!("Couldn't read drawing before saving: {error}"))?;
     if existing_scene != scene_json.as_bytes() {
-        snapshot_scene(root, relative_path, &existing_scene)?;
+        // Excalidraw emits changes for viewport, selection, and other UI-only
+        // appState. Persist those changes, but do not turn them into recovery
+        // points: a history entry should represent a changed canvas.
+        if history_enabled && scene_contents_changed(&existing_scene, scene_json.as_bytes()) {
+            snapshot_scene(root, relative_path, &existing_scene)?;
+        }
         atomic_write(&path, scene_json.as_bytes())?;
         invalidate_thumbnail(root, relative_path);
     }
     Ok(())
+}
+
+fn scene_contents_changed(existing_scene: &[u8], next_scene: &[u8]) -> bool {
+    fn content(scene: &[u8]) -> Option<Value> {
+        let scene = serde_json::from_slice::<Value>(scene).ok()?;
+        Some(json!({
+            "elements": scene.get("elements")?,
+            "files": scene.get("files")?,
+        }))
+    }
+
+    match (content(existing_scene), content(next_scene)) {
+        (Some(existing), Some(next)) => existing != next,
+        // Validation makes this fallback unlikely, but never suppress a
+        // recovery point when an older scene cannot be interpreted.
+        _ => existing_scene != next_scene,
+    }
 }
 
 fn list_versions_at(root: &Path, relative_path: &str) -> CommandResult<Vec<VersionSummary>> {
@@ -248,7 +310,9 @@ fn read_version_at(root: &Path, relative_path: &str, version_id: &str) -> Comman
 
 fn restore_version_at(root: &Path, relative_path: &str, version_id: &str) -> CommandResult<()> {
     let scene_json = read_version_at(root, relative_path, version_id)?;
-    write_scene_at(root, relative_path, &scene_json)
+    // A restore must retain the current canvas, even if history was disabled
+    // after this version was created.
+    write_scene_at(root, relative_path, &scene_json, true)
 }
 
 fn snapshot_scene(root: &Path, relative_path: &str, scene: &[u8]) -> CommandResult<()> {
@@ -604,6 +668,7 @@ fn list_library(root: PathBuf) -> CommandResult<LibraryState> {
         folders,
         recent_paths: Vec::new(),
         pinned_paths: Vec::new(),
+        history_enabled: true,
     })
 }
 
@@ -688,6 +753,7 @@ fn with_preferences(app: &AppHandle, mut state: LibraryState) -> CommandResult<L
         .filter(|path| available_paths.contains(&path.as_str()))
         .cloned()
         .collect();
+    state.history_enabled = preferences.history_enabled;
     Ok(state)
 }
 
@@ -1033,7 +1099,7 @@ mod tests {
         let second = versioned_scene("second");
         fs::write(root.join(relative_path), &first).expect("write initial scene");
 
-        write_scene_at(&root, relative_path, &second).expect("save updated scene");
+        write_scene_at(&root, relative_path, &second, true).expect("save updated scene");
         let versions = list_versions_at(&root, relative_path).expect("list saved versions");
         assert_eq!(versions.len(), 1);
         assert_eq!(
@@ -1048,6 +1114,39 @@ mod tests {
         assert!(versions.iter().any(|version| {
             read_version_at(&root, relative_path, &version.id).as_deref() == Ok(second.as_str())
         }));
+        fs::remove_dir_all(root).expect("remove test directory");
+    }
+
+    #[test]
+    fn does_not_snapshot_viewport_only_autosaves() {
+        let root = env::temp_dir().join(format!("localcanvas-test-{}", Uuid::new_v4()));
+        let relative_path = "history.excalidraw";
+        fs::create_dir_all(&root).expect("create library root");
+        let root = root.canonicalize().expect("canonical library root");
+        let first = versioned_scene("first");
+        let mut viewport_only_change: serde_json::Value = serde_json::from_str(&first).unwrap();
+        viewport_only_change["appState"] = serde_json::json!({ "scrollX": 120, "scrollY": 45 });
+        fs::write(root.join(relative_path), &first).expect("write initial scene");
+
+        write_scene_at(&root, relative_path, &viewport_only_change.to_string(), true)
+            .expect("save viewport change");
+
+        assert!(list_versions_at(&root, relative_path).unwrap().is_empty());
+        fs::remove_dir_all(root).expect("remove test directory");
+    }
+
+    #[test]
+    fn does_not_create_versions_when_history_is_disabled() {
+        let root = env::temp_dir().join(format!("localcanvas-test-{}", Uuid::new_v4()));
+        let relative_path = "history.excalidraw";
+        fs::create_dir_all(&root).expect("create library root");
+        let root = root.canonicalize().expect("canonical library root");
+        fs::write(root.join(relative_path), versioned_scene("first")).expect("write initial scene");
+
+        write_scene_at(&root, relative_path, &versioned_scene("second"), false)
+            .expect("save changed scene");
+
+        assert!(list_versions_at(&root, relative_path).unwrap().is_empty());
         fs::remove_dir_all(root).expect("remove test directory");
     }
 

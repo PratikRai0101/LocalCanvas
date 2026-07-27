@@ -112,6 +112,11 @@ pub fn set_drawing_pinned(
 }
 
 #[tauri::command]
+pub fn set_history_enabled(app: AppHandle, enabled: bool) -> CommandResult<()> {
+    library::set_history_enabled(&app, enabled)
+}
+
+#[tauri::command]
 pub fn read_scene(app: AppHandle, relative_path: String) -> CommandResult<String> {
     library::read_scene(&app, &relative_path)
 }

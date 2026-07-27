@@ -97,6 +97,7 @@ pub fn run() {
             commands::get_backlinks,
             commands::record_drawing_opened,
             commands::set_drawing_pinned,
+            commands::set_history_enabled,
             commands::read_scene,
             commands::write_scene,
             commands::list_scene_versions,

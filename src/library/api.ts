@@ -18,6 +18,7 @@ export type LibraryState = {
   folders: FolderSummary[];
   recentPaths: string[];
   pinnedPaths: string[];
+  historyEnabled: boolean;
 };
 
 export type ImportedScene = {
@@ -57,6 +58,8 @@ export const libraryApi = {
     invoke<void>("record_drawing_opened", { relativePath }),
   setDrawingPinned: (relativePath: string, pinned: boolean) =>
     invoke<void>("set_drawing_pinned", { relativePath, pinned }),
+  setHistoryEnabled: (enabled: boolean) =>
+    invoke<void>("set_history_enabled", { enabled }),
   readScene: (relativePath: string) =>
     invoke<string>("read_scene", { relativePath }),
   writeScene: (relativePath: string, sceneJson: string) =>

@@ -21,6 +21,7 @@ const libraryApi = vi.hoisted(() => ({
   pickImportScene: vi.fn(),
   recordDrawingOpened: vi.fn(),
   setDrawingPinned: vi.fn(),
+  setHistoryEnabled: vi.fn(),
   createDrawing: vi.fn(),
   createFolder: vi.fn(),
   deleteDrawing: vi.fn(),
@@ -74,6 +75,7 @@ const library: LibraryState = {
   folders: [],
   recentPaths: [],
   pinnedPaths: [],
+  historyEnabled: true,
 };
 
 describe("App autosave wiring", () => {
@@ -84,6 +86,7 @@ describe("App autosave wiring", () => {
     libraryApi.pickImportScene.mockReset();
     libraryApi.listSceneVersions.mockReset();
     libraryApi.restoreSceneVersion.mockReset();
+    libraryApi.setHistoryEnabled.mockReset();
     libraryApi.recordDrawingOpened.mockReset();
     libraryApi.setDrawingPinned.mockReset();
     libraryApi.createDrawing.mockReset();
