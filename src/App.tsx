@@ -27,6 +27,7 @@ function App() {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<DrawingSummary[] | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
 
   const refreshLibrary = useCallback(async () => {
@@ -46,14 +47,41 @@ function App() {
     void refreshLibrary();
   }, [refreshLibrary]);
 
+  useEffect(() => {
+    const normalizedQuery = query.trim();
+    if (!normalizedQuery || !library.root) {
+      setSearchResults(null);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void libraryApi.searchDrawings(normalizedQuery)
+        .then((results) => {
+          if (!cancelled) {
+            setSearchResults(results);
+          }
+        })
+        .catch((cause) => {
+          console.error("Failed to search drawings", cause);
+          if (!cancelled) {
+            setSearchResults([]);
+          }
+        });
+    }, 150);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [library.root, query]);
+
   const visibleDrawings = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase();
-    return library.drawings.filter((drawing) => {
-      const isInSelectedFolder = !selectedFolderPath || drawing.path.startsWith(`${selectedFolderPath}/`);
-      const matchesQuery = !normalizedQuery || `${drawing.title} ${drawing.path}`.toLocaleLowerCase().includes(normalizedQuery);
-      return isInSelectedFolder && matchesQuery;
-    });
-  }, [library.drawings, query, selectedFolderPath]);
+    const searchedDrawings = query.trim() ? searchResults ?? [] : library.drawings;
+    return searchedDrawings.filter((drawing) =>
+      !selectedFolderPath || drawing.path.startsWith(`${selectedFolderPath}/`),
+    );
+  }, [library.drawings, query, searchResults, selectedFolderPath]);
 
   const recentDrawings = library.drawings.slice(0, 6);
 
