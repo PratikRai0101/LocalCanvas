@@ -166,6 +166,21 @@ kbd, .search-shortcut { padding: 1px 4px; color: #9e9ba1; background: #fff; bord
 .localcanvas-canvas-actions button:disabled { cursor: not-allowed; opacity: .6; }
 .presentation-message { align-self: center; max-width: 180px; padding: 5px 7px; color: #5d5964; background: rgba(255, 255, 255, .94); border: 1px solid #dedce0; border-radius: 5px; font-size: 10px; }
 .portal-picker { position: absolute; z-index: 3; top: 50px; right: 14px; width: 240px; padding: 12px; color: #4e4b54; background: #fff; border: 1px solid #dedce0; border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .14); font-size: 11px; }
+.layers-panel { position: absolute; z-index: 4; top: 14px; right: 14px; bottom: 14px; display: flex; width: 278px; flex-direction: column; color: #4e4b54; background: rgba(255, 255, 255, .98); border: 1px solid #dedce0; border-radius: 9px; box-shadow: 0 10px 32px rgba(0, 0, 0, .16); }
+.layers-panel header { display: flex; align-items: flex-start; justify-content: space-between; padding: 13px 13px 10px; border-bottom: 1px solid #ece9ed; }
+.layers-panel header p { margin: 0 0 3px; color: #908c96; font-size: 9px; font-weight: 700; letter-spacing: .1em; }
+.layers-panel header h2 { margin: 0; color: #39363e; font-size: 14px; }
+.layers-panel header > button { padding: 0 4px; color: #918d96; background: transparent; border: 0; font-size: 20px; line-height: 1; }
+.layers-list { min-height: 0; flex: 1; overflow: auto; padding: 5px; }
+.layer-row { display: flex; align-items: center; min-height: 34px; gap: 4px; border-radius: 5px; }
+.layer-row:hover { background: #f5f4f7; }
+.layer-row.is-hidden { opacity: .52; }
+.layer-name { min-width: 0; flex: 1; padding: 6px 7px; overflow: hidden; color: #56535b; text-align: left; text-overflow: ellipsis; white-space: nowrap; background: transparent; border: 0; font: 500 11px Inter, sans-serif; }
+.layer-name:hover { color: #49458c; }
+.layer-actions { display: flex; gap: 1px; padding-right: 4px; }
+.layer-actions button { width: 24px; height: 24px; padding: 0; color: #77737c; background: transparent; border: 0; border-radius: 4px; font: 600 12px Inter, sans-serif; }
+.layer-actions button:hover { color: #514da6; background: #eae9fb; }
+.layers-empty { margin: auto; padding: 18px; color: #928e97; text-align: center; font-size: 11px; }
 .portal-picker label { display: grid; gap: 6px; font-weight: 600; }
 .portal-picker select { width: 100%; padding: 6px; color: inherit; border: 1px solid #dedce0; border-radius: 4px; background: #fff; font: inherit; }
 .portal-picker > div { display: flex; justify-content: flex-end; gap: 6px; height: auto; margin-top: 10px; }

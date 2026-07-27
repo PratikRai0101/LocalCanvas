@@ -29,6 +29,9 @@ pub fn run() {
             let command_palette = MenuItemBuilder::with_id("command-palette", "Command Palette…")
                 .accelerator("CmdOrCtrl+K")
                 .build(app)?;
+            let toggle_layers = MenuItemBuilder::with_id("toggle-layers", "Layers")
+                .accelerator("CmdOrCtrl+Shift+L")
+                .build(app)?;
 
             let app_menu = SubmenuBuilder::new(app, "LocalCanvas")
                 .about(None)
@@ -59,6 +62,7 @@ pub fn run() {
                 .build()?;
             let view_menu = SubmenuBuilder::new(app, "View")
                 .item(&command_palette)
+                .item(&toggle_layers)
                 .separator()
                 .fullscreen()
                 .build()?;
@@ -81,7 +85,7 @@ pub fn run() {
         })
         .on_menu_event(|app, event| match event.id().as_ref() {
             "new-drawing" | "new-folder" | "import-drawing" | "rename-active"
-            | "command-palette" => {
+            | "command-palette" | "toggle-layers" => {
                 let _ = app.emit("menu-action", event.id().as_ref());
             }
             _ => {}

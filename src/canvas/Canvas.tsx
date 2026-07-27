@@ -13,9 +13,12 @@ import type {
   ExcalidrawInitialDataState,
   ExcalidrawProps,
 } from "@excalidraw/excalidraw/types";
+import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DrawingSummary, libraryApi } from "../library/api";
 import { clientPositionInCanvas, isSupportedImagePath } from "./nativeImageDrop";
+import { LayersPanel } from "./LayersPanel";
+import { layerEntries, moveLayer, setLayerLocked, setLayerVisibility } from "./layers";
 import { presentationFrames } from "./presentation";
 import { createPortalElements, ensureDrawingIdentity, portalTargetForSelection } from "./portalMetadata";
 import type { PortalLink } from "./portalMetadata";
@@ -23,6 +26,8 @@ import type { PortalLink } from "./portalMetadata";
 type CanvasProps = {
   drawingPath: string;
   drawingTitle: string;
+  isLayersOpen: boolean;
+  onCloseLayers: () => void;
   onSaveStatus: (status: SaveStatus) => void;
   onSaved: () => void;
   onAutosaveController?: (controller: { flush: () => Promise<void>; suspend: () => void } | null) => void;
@@ -45,6 +50,8 @@ const AUTOSAVE_DELAY_MS = 800;
 export function Canvas({
   drawingPath,
   drawingTitle,
+  isLayersOpen,
+  onCloseLayers,
   onSaveStatus,
   onSaved,
   onAutosaveController,
@@ -68,6 +75,7 @@ export function Canvas({
   const [presentationSlides, setPresentationSlides] = useState<PresentationFrame[]>([]);
   const [presentationSlideIndex, setPresentationSlideIndex] = useState(0);
   const [isPresenting, setIsPresenting] = useState(false);
+  const [layerElements, setLayerElements] = useState<readonly ExcalidrawElement[]>([]);
   const [presentationMessage, setPresentationMessage] = useState<string | null>(null);
   const [usesNativeFileDrops, setUsesNativeFileDrops] = useState(false);
   const [portalTargetPath, setPortalTargetPath] = useState("");
@@ -191,6 +199,28 @@ export function Canvas({
     },
     [flushAutosave],
   );
+
+  useEffect(() => {
+    if (isLayersOpen) {
+      setLayerElements(excalidrawApi.current?.getSceneElementsIncludingDeleted() ?? []);
+    }
+  }, [isLayersOpen]);
+
+  const selectLayer = useCallback((id: string) => {
+    const api = excalidrawApi.current;
+    const element = api?.getSceneElementsIncludingDeleted().find((candidate) => candidate.id === id);
+    if (!api || !element) return;
+    api.updateScene({ appState: { selectedElementIds: { [id]: true } } });
+    api.scrollToContent(element, { fitToViewport: false, animate: true });
+  }, []);
+
+  const updateLayers = useCallback((update: (elements: readonly ExcalidrawElement[]) => ExcalidrawElement[]) => {
+    const api = excalidrawApi.current;
+    if (!api) return;
+    const next = update(api.getSceneElementsIncludingDeleted());
+    api.updateScene({ elements: next });
+    setLayerElements(next);
+  }, []);
 
   const startPresentation = useCallback(() => {
     const api = excalidrawApi.current;
@@ -402,6 +432,9 @@ export function Canvas({
         files: change[2],
       };
       setFrameCount(presentationFrames(change[0]).length);
+      if (isLayersOpen) {
+        setLayerElements(change[0]);
+      }
 
       if (presentationActive.current) {
         return;
@@ -414,7 +447,7 @@ export function Canvas({
         void saveLatestScene();
       }, AUTOSAVE_DELAY_MS);
     },
-    [saveLatestScene],
+    [isLayersOpen, saveLatestScene],
   );
 
   if (loadError) {
@@ -446,6 +479,16 @@ export function Canvas({
         }
       }}
     >
+      {isLayersOpen && (
+        <LayersPanel
+          layers={layerEntries(layerElements)}
+          onSelect={selectLayer}
+          onMove={(id, direction) => updateLayers((elements) => moveLayer(elements, id, direction))}
+          onSetVisible={(id, visible) => updateLayers((elements) => setLayerVisibility(elements, id, visible))}
+          onSetLocked={(id, locked) => updateLayers((elements) => setLayerLocked(elements, id, locked))}
+          onClose={onCloseLayers}
+        />
+      )}
       {isPortalPickerOpen && (
         <div className="portal-picker" role="dialog" aria-label="Create portal">
           <label>

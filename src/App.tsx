@@ -50,6 +50,7 @@ function App() {
   const [backlinks, setBacklinks] = useState<DrawingSummary[]>([]);
   const [isGraphOpen, setIsGraphOpen] = useState(false);
   const [graph, setGraph] = useState<GraphData | null>(null);
+  const [isLayersOpen, setIsLayersOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [versions, setVersions] = useState<SceneVersion[]>([]);
@@ -547,6 +548,11 @@ function App() {
         setIsCommandPaletteOpen(true);
         return;
       }
+      if (event.shiftKey && event.key.toLowerCase() === "l" && activeDrawing) {
+        event.preventDefault();
+        setIsLayersOpen((open) => !open);
+        return;
+      }
 
       const target = event.target as HTMLElement | null;
       if (target?.matches("input, textarea, select, [contenteditable='true']")) {
@@ -593,6 +599,8 @@ function App() {
         setNewItemName(activeDrawing.title);
       } else if (payload === "command-palette") {
         setIsCommandPaletteOpen(true);
+      } else if (payload === "toggle-layers" && activeDrawing) {
+        setIsLayersOpen((open) => !open);
       }
     }).then((stopListening) => {
       unlisten = stopListening;
@@ -805,6 +813,8 @@ function App() {
               key={`${activeDrawing.path}:${canvasRevision}`}
               drawingPath={activeDrawing.path}
               drawingTitle={activeDrawing.title}
+              isLayersOpen={isLayersOpen}
+              onCloseLayers={() => setIsLayersOpen(false)}
               onSaveStatus={handleSaveStatus}
               onSaved={handleCanvasSaved}
               onAutosaveController={(controller) => { canvasAutosave.current = controller; }}
