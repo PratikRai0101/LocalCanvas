@@ -30,8 +30,22 @@ export const libraryApi = {
     invoke<string | null>("read_thumbnail", { relativePath }),
   writeThumbnail: (relativePath: string, thumbnailSvg: string) =>
     invoke<void>("write_thumbnail", { relativePath, thumbnailSvg }),
+  importDrawing: (parentPath: string) =>
+    invoke<DrawingSummary>("import_drawing", { parentPath }),
   createDrawing: (parentPath: string, title: string) =>
     invoke<DrawingSummary>("create_drawing", { parentPath, title }),
   createFolder: (parentPath: string, name: string) =>
     invoke<FolderSummary>("create_folder", { parentPath, name }),
+  deleteDrawing: (relativePath: string) =>
+    invoke<void>("delete_drawing", { relativePath }),
+  deleteFolder: (relativePath: string) =>
+    invoke<void>("delete_folder", { relativePath }),
+  renameDrawing: (relativePath: string, title: string) =>
+    invoke<DrawingSummary>("rename_drawing", { relativePath, title }),
+  renameFolder: (relativePath: string, name: string) =>
+    invoke<FolderSummary>("rename_folder", { relativePath, name }),
+  moveDrawing: (relativePath: string, parentPath: string) =>
+    invoke<DrawingSummary>("move_drawing", { relativePath, parentPath }),
+  moveFolder: (relativePath: string, parentPath: string) =>
+    invoke<FolderSummary>("move_folder", { relativePath, parentPath }),
 };

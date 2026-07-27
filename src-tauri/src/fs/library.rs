@@ -138,7 +138,34 @@ pub fn write_thumbnail(
 
     let root = active_library_root(app)?;
     resolve_existing_drawing_path(&root, relative_path)?;
-    atomic_write(&thumbnail_path(&root, relative_path), thumbnail_svg.as_bytes())
+    atomic_write(
+        &thumbnail_path(&root, relative_path),
+        thumbnail_svg.as_bytes(),
+    )
+}
+
+pub fn import_drawing(
+    app: &AppHandle,
+    parent_path: &str,
+    source_path: &Path,
+) -> CommandResult<DrawingSummary> {
+    if !is_excalidraw_file(source_path) {
+        return Err("Choose a standard .excalidraw file to import.".to_owned());
+    }
+
+    let root = active_library_root(app)?;
+    let parent = resolve_directory_path(&root, parent_path)?;
+    let contents = fs::read_to_string(source_path)
+        .map_err(|error| format!("Couldn't read drawing to import: {error}"))?;
+    validate_excalidraw_scene(&contents)?;
+    let title = source_path
+        .file_stem()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| "Drawing filename isn't valid UTF-8.".to_owned())?;
+    let destination = unique_path(&parent, &drawing_file_name(title)?);
+
+    atomic_write(&destination, contents.as_bytes())?;
+    drawing_summary(&root, &destination)
 }
 
 pub fn create_drawing(
@@ -174,6 +201,116 @@ pub fn create_folder(
 
     fs::create_dir(&folder).map_err(|error| format!("Couldn't create folder: {error}"))?;
     folder_summary(&root, &folder)
+}
+
+pub fn delete_drawing(app: &AppHandle, relative_path: &str) -> CommandResult<()> {
+    let root = active_library_root(app)?;
+    let path = resolve_existing_drawing_path(&root, relative_path)?;
+    fs::remove_file(path).map_err(|error| format!("Couldn't delete drawing: {error}"))?;
+    invalidate_thumbnail(&root, relative_path);
+    Ok(())
+}
+
+pub fn delete_folder(app: &AppHandle, relative_path: &str) -> CommandResult<()> {
+    if relative_path.is_empty() {
+        return Err("The library root can't be deleted from LocalCanvas.".to_owned());
+    }
+
+    let root = active_library_root(app)?;
+    let path = resolve_directory_path(&root, relative_path)?;
+    fs::remove_dir_all(path).map_err(|error| format!("Couldn't delete folder: {error}"))
+}
+
+pub fn rename_drawing(
+    app: &AppHandle,
+    relative_path: &str,
+    title: &str,
+) -> CommandResult<DrawingSummary> {
+    let root = active_library_root(app)?;
+    let source = resolve_existing_drawing_path(&root, relative_path)?;
+    let destination = source
+        .parent()
+        .ok_or_else(|| "Couldn't determine the drawing folder.".to_owned())?
+        .join(drawing_file_name(title)?);
+    move_path(&source, &destination, "drawing")?;
+    invalidate_thumbnail(&root, relative_path);
+    drawing_summary(&root, &destination)
+}
+
+pub fn rename_folder(
+    app: &AppHandle,
+    relative_path: &str,
+    name: &str,
+) -> CommandResult<FolderSummary> {
+    if relative_path.is_empty() {
+        return Err("The library root can't be renamed from LocalCanvas.".to_owned());
+    }
+
+    let root = active_library_root(app)?;
+    let source = resolve_directory_path(&root, relative_path)?;
+    let destination = source
+        .parent()
+        .ok_or_else(|| "Couldn't determine the folder's parent.".to_owned())?
+        .join(folder_name(name)?);
+    move_path(&source, &destination, "folder")?;
+    folder_summary(&root, &destination)
+}
+
+pub fn move_drawing(
+    app: &AppHandle,
+    relative_path: &str,
+    parent_path: &str,
+) -> CommandResult<DrawingSummary> {
+    let root = active_library_root(app)?;
+    let source = resolve_existing_drawing_path(&root, relative_path)?;
+    let parent = resolve_directory_path(&root, parent_path)?;
+    let file_name = source
+        .file_name()
+        .ok_or_else(|| "Drawing filename isn't valid.".to_owned())?;
+    let destination = parent.join(file_name);
+    move_path(&source, &destination, "drawing")?;
+    invalidate_thumbnail(&root, relative_path);
+    drawing_summary(&root, &destination)
+}
+
+pub fn move_folder(
+    app: &AppHandle,
+    relative_path: &str,
+    parent_path: &str,
+) -> CommandResult<FolderSummary> {
+    if relative_path.is_empty() {
+        return Err("The library root can't be moved from LocalCanvas.".to_owned());
+    }
+
+    let root = active_library_root(app)?;
+    let source = resolve_directory_path(&root, relative_path)?;
+    let parent = resolve_directory_path(&root, parent_path)?;
+    if parent.starts_with(&source) {
+        return Err("A folder can't be moved into itself or one of its children.".to_owned());
+    }
+
+    let name = source
+        .file_name()
+        .ok_or_else(|| "Folder name isn't valid.".to_owned())?;
+    let destination = parent.join(name);
+    move_path(&source, &destination, "folder")?;
+    folder_summary(&root, &destination)
+}
+
+fn move_path(source: &Path, destination: &Path, item_kind: &str) -> CommandResult<()> {
+    if source == destination {
+        return Ok(());
+    }
+    if destination.exists() {
+        return Err(format!(
+            "A file or folder named '{}' already exists in that location.",
+            destination
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+        ));
+    }
+    fs::rename(source, destination).map_err(|error| format!("Couldn't move {item_kind}: {error}"))
 }
 
 fn list_library(root: PathBuf) -> CommandResult<LibraryState> {
@@ -534,7 +671,10 @@ mod tests {
         let second = thumbnail_path(&root, "Architecture/db-schema.excalidraw");
 
         assert_ne!(first, second);
-        assert_eq!(first.parent().unwrap(), root.join(".localcanvas/thumbnails"));
+        assert_eq!(
+            first.parent().unwrap(),
+            root.join(".localcanvas/thumbnails")
+        );
         assert_eq!(first.extension().unwrap(), "svg");
     }
 

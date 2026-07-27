@@ -74,6 +74,23 @@ pub fn write_thumbnail(
 }
 
 #[tauri::command]
+pub async fn import_drawing(app: AppHandle, parent_path: String) -> CommandResult<DrawingSummary> {
+    let selected = app
+        .dialog()
+        .file()
+        .set_title("Import an Excalidraw drawing")
+        .add_filter("Excalidraw drawings", &["excalidraw"])
+        .blocking_pick_file();
+    let Some(selected) = selected else {
+        return Err("No drawing was selected.".to_owned());
+    };
+    let path: PathBuf = selected
+        .into_path()
+        .map_err(|error| format!("Couldn't use the selected drawing: {error}"))?;
+    library::import_drawing(&app, &parent_path, &path)
+}
+
+#[tauri::command]
 pub fn create_drawing(
     app: AppHandle,
     parent_path: String,
@@ -89,4 +106,50 @@ pub fn create_folder(
     name: String,
 ) -> CommandResult<FolderSummary> {
     library::create_folder(&app, &parent_path, &name)
+}
+
+#[tauri::command]
+pub fn delete_drawing(app: AppHandle, relative_path: String) -> CommandResult<()> {
+    library::delete_drawing(&app, &relative_path)
+}
+
+#[tauri::command]
+pub fn delete_folder(app: AppHandle, relative_path: String) -> CommandResult<()> {
+    library::delete_folder(&app, &relative_path)
+}
+
+#[tauri::command]
+pub fn rename_drawing(
+    app: AppHandle,
+    relative_path: String,
+    title: String,
+) -> CommandResult<DrawingSummary> {
+    library::rename_drawing(&app, &relative_path, &title)
+}
+
+#[tauri::command]
+pub fn rename_folder(
+    app: AppHandle,
+    relative_path: String,
+    name: String,
+) -> CommandResult<FolderSummary> {
+    library::rename_folder(&app, &relative_path, &name)
+}
+
+#[tauri::command]
+pub fn move_drawing(
+    app: AppHandle,
+    relative_path: String,
+    parent_path: String,
+) -> CommandResult<DrawingSummary> {
+    library::move_drawing(&app, &relative_path, &parent_path)
+}
+
+#[tauri::command]
+pub fn move_folder(
+    app: AppHandle,
+    relative_path: String,
+    parent_path: String,
+) -> CommandResult<FolderSummary> {
+    library::move_folder(&app, &relative_path, &parent_path)
 }
