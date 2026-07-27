@@ -24,6 +24,19 @@ npm install
 npm run tauri dev
 ```
 
+## Build a Spotlight-enabled macOS app
+
+Direct Spotlight actions require macOS 26 and the bundled App Intents extension.
+Build the distributable `.app` with:
+
+```bash
+npm run build:macos
+```
+
+The command produces `src-tauri/target/release/bundle/macos/LocalCanvas.app`.
+Set `APPLE_SIGNING_IDENTITY` to a Developer ID identity when preparing a signed
+release; local builds use ad-hoc signing.
+
 ## Verify
 
 ```bash

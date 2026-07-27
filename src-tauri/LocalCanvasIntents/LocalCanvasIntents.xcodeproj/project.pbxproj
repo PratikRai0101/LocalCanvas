@@ -1,0 +1,58 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* LocalCanvasIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* LocalCanvasIntents.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A10000000000000000000002 /* LocalCanvasIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalCanvasIntents.swift; sourceTree = "<group>"; };
+		A10000000000000000000003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A10000000000000000000004 /* LocalCanvasIntents.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LocalCanvasIntents.entitlements; sourceTree = "<group>"; };
+		A10000000000000000000005 /* LocalCanvasIntents.appex */ = {isa = PBXFileReference; explicitFileType = wrapper.app-extension; includeInIndex = 0; path = LocalCanvasIntents.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		A10000000000000000000006 /* LocalCanvasIntents */ = {isa = PBXGroup; children = (A10000000000000000000002 /* LocalCanvasIntents.swift */, A10000000000000000000003 /* Info.plist */, A10000000000000000000004 /* LocalCanvasIntents.entitlements */, ); path = ""; sourceTree = "<group>"; };
+		A10000000000000000000007 = {isa = PBXGroup; children = (A10000000000000000000006 /* LocalCanvasIntents */, A10000000000000000000008 /* Products */, ); sourceTree = "<group>"; };
+		A10000000000000000000008 /* Products */ = {isa = PBXGroup; children = (A10000000000000000000005 /* LocalCanvasIntents.appex */, ); name = Products; sourceTree = "<group>"; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A10000000000000000000009 /* LocalCanvasIntents */ = {isa = PBXNativeTarget; buildConfigurationList = A10000000000000000000010 /* Build configuration list for PBXNativeTarget "LocalCanvasIntents" */; buildPhases = (A10000000000000000000011 /* Sources */, A10000000000000000000012 /* Frameworks */, A10000000000000000000013 /* Resources */, ); buildRules = (); dependencies = (); name = LocalCanvasIntents; productName = LocalCanvasIntents; productReference = A10000000000000000000005 /* LocalCanvasIntents.appex */; productType = "com.apple.product-type.extensionkit-extension"; };
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A10000000000000000000014 /* Project object */ = {isa = PBXProject; attributes = { BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 2600; LastUpgradeCheck = 2600; TargetAttributes = { A10000000000000000000009 = { CreatedOnToolsVersion = 26.0; }; }; }; buildConfigurationList = A10000000000000000000015 /* Build configuration list for PBXProject "LocalCanvasIntents" */; compatibilityVersion = "Xcode 16.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base, ); mainGroup = A10000000000000000000007; minimizedProjectReferenceProxies = 1; preferredProjectObjectVersion = 77; productRefGroup = A10000000000000000000008 /* Products */; projectDirPath = ""; projectRoot = ""; targets = (A10000000000000000000009 /* LocalCanvasIntents */, ); };
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A10000000000000000000013 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A10000000000000000000011 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001 /* LocalCanvasIntents.swift in Sources */, ); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A10000000000000000000012 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A10000000000000000000016 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CODE_SIGNING_ALLOWED = YES; CODE_SIGN_ENTITLEMENTS = LocalCanvasIntents.entitlements; CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = ""; INFOPLIST_FILE = Info.plist; MACOSX_DEPLOYMENT_TARGET = 26.0; PRODUCT_BUNDLE_IDENTIFIER = com.pratikrai.localcanvas.intents; PRODUCT_NAME = LocalCanvasIntents; SDKROOT = macosx; SWIFT_VERSION = 6.0; }; name = Debug; };
+		A10000000000000000000017 /* Release */ = {isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CODE_SIGNING_ALLOWED = YES; CODE_SIGN_ENTITLEMENTS = LocalCanvasIntents.entitlements; CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = ""; INFOPLIST_FILE = Info.plist; MACOSX_DEPLOYMENT_TARGET = 26.0; PRODUCT_BUNDLE_IDENTIFIER = com.pratikrai.localcanvas.intents; PRODUCT_NAME = LocalCanvasIntents; SDKROOT = macosx; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = "-O"; SWIFT_VERSION = 6.0; }; name = Release; };
+		A10000000000000000000018 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = { CLANG_ENABLE_MODULES = YES; CODE_SIGNING_ALLOWED = YES; MACOSX_DEPLOYMENT_TARGET = 26.0; SDKROOT = macosx; }; name = Debug; };
+		A10000000000000000000019 /* Release */ = {isa = XCBuildConfiguration; buildSettings = { CLANG_ENABLE_MODULES = YES; CODE_SIGNING_ALLOWED = YES; MACOSX_DEPLOYMENT_TARGET = 26.0; SDKROOT = macosx; }; name = Release; };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A10000000000000000000010 /* Build configuration list for PBXNativeTarget "LocalCanvasIntents" */ = {isa = XCConfigurationList; buildConfigurations = (A10000000000000000000016 /* Debug */, A10000000000000000000017 /* Release */, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		A10000000000000000000015 /* Build configuration list for PBXProject "LocalCanvasIntents" */ = {isa = XCConfigurationList; buildConfigurations = (A10000000000000000000018 /* Debug */, A10000000000000000000019 /* Release */, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+	};
+	rootObject = A10000000000000000000014 /* Project object */;
+}

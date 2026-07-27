@@ -7,6 +7,7 @@ dist-ssr/
 
 # Rust / Tauri
 src-tauri/target/
+src-tauri/LocalCanvasIntents/build/
 
 # Local app data (never commit user drawings or derived index)
 .localcanvas/

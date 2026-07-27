@@ -1,4 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
+import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { loadFromBlob, serializeAsJSON } from "@excalidraw/excalidraw";
 import { FormEvent, MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, SaveStatus } from "./canvas/Canvas";
@@ -630,6 +631,25 @@ function App() {
     });
     return () => unlisten?.();
   }, [activeDrawing, library.root, selectedFolderPath]);
+
+  useEffect(() => {
+    if (!("__TAURI_INTERNALS__" in window)) {
+      return;
+    }
+
+    const handleUrls = (urls: string[]) => {
+      if (urls.some((url) => url === "localcanvas://quick-capture")) {
+        void createQuickCapture();
+      }
+    };
+
+    let unlisten: (() => void) | undefined;
+    void getCurrent().then(handleUrls);
+    void onOpenUrl(handleUrls).then((stopListening) => {
+      unlisten = stopListening;
+    });
+    return () => unlisten?.();
+  }, [library.root, isCreating]);
 
   useEffect(() => {
     if (!("__TAURI_INTERNALS__" in window)) {

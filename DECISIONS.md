@@ -70,3 +70,11 @@ Status: Accepted
 Context: Autosave needs recoverable history, but a history system must never replace the portable `.excalidraw` file as the source of truth or grow indefinitely.
 Decision: Before an autosave replaces changed scene contents, atomically copy the prior scene to `.localcanvas/versions/<drawing-id>/`. Keep the newest 50 snapshots per drawing. Restoring a snapshot uses the normal save path, so the current scene becomes a new snapshot first. A path-hash directory temporarily preserves snapshots for drawings created before durable metadata exists.
 Consequences: A restored drawing never destroys the current state, history remains local and bounded, and moves/renames preserve history once the drawing UUID metadata is present. Version snapshots are convenience recovery data, not a required input for opening the current drawing.
+
+## ADR-008: Expose quick capture to Spotlight through an App Intents extension
+
+Date: 2026-07-28
+Status: Accepted
+Context: macOS 26 can run App Shortcuts directly from Spotlight, but Tauri has no native Swift target from which macOS can discover App Intents. Reimplementing drawing creation in the extension would create a second, unsafe owner of LocalCanvas library state.
+Decision: Bundle a minimal native Swift App Intents extension (`LocalCanvasIntents.appex`) alongside the Tauri app. Its `New Quick Canvas` shortcut opens the `localcanvas://quick-capture` deep link; the React frontend performs the existing quick-capture flow. Build it with the tracked Xcode project and embed/re-sign it through `npm run build:macos`.
+Consequences: Direct Spotlight execution is available on macOS 26+, and the same action appears in Shortcuts/Siri. macOS release builds require Xcode and must use the Spotlight-aware build command rather than Tauri's bare bundle command. The extension contains no drawing data or write logic, preserving the frontend/Rust path as the sole owner of quick-capture behavior.
