@@ -1,4 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
+import { loadFromBlob, serializeAsJSON } from "@excalidraw/excalidraw";
 import { FormEvent, MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Canvas, SaveStatus } from "./canvas/Canvas";
 import {
@@ -119,7 +120,20 @@ function App() {
 
     setIsCreating(true);
     try {
-      const drawing = await libraryApi.importDrawing(selectedFolderPath);
+      const imported = await libraryApi.pickImportScene();
+      const restored = await loadFromBlob(
+        new Blob([new Uint8Array(imported.contents)], { type: imported.mimeType }),
+        null,
+        null,
+      );
+      const drawing = await libraryApi.createDrawing(
+        selectedFolderPath,
+        imported.fileName.replace(/\.(excalidraw|png|svg)$/i, "") || "Imported drawing",
+      );
+      await libraryApi.writeScene(
+        drawing.path,
+        serializeAsJSON(restored.elements, restored.appState, restored.files, "local"),
+      );
       const nextLibrary = await refreshLibrary();
       setActiveDrawing(nextLibrary.drawings.find((item) => item.path === drawing.path) ?? drawing);
       setSelectedFolderPath(parentPath(drawing.path));

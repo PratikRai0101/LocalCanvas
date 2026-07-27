@@ -146,30 +146,6 @@ pub fn write_thumbnail(
     )
 }
 
-pub fn import_drawing(
-    app: &AppHandle,
-    parent_path: &str,
-    source_path: &Path,
-) -> CommandResult<DrawingSummary> {
-    if !is_excalidraw_file(source_path) {
-        return Err("Choose a standard .excalidraw file to import.".to_owned());
-    }
-
-    let root = active_library_root(app)?;
-    let parent = resolve_directory_path(&root, parent_path)?;
-    let contents = fs::read_to_string(source_path)
-        .map_err(|error| format!("Couldn't read drawing to import: {error}"))?;
-    validate_excalidraw_scene(&contents)?;
-    let title = source_path
-        .file_stem()
-        .and_then(|name| name.to_str())
-        .ok_or_else(|| "Drawing filename isn't valid UTF-8.".to_owned())?;
-    let destination = unique_path(&parent, &drawing_file_name(title)?);
-
-    atomic_write(&destination, contents.as_bytes())?;
-    drawing_summary(&root, &destination)
-}
-
 pub fn create_drawing(
     app: &AppHandle,
     parent_path: &str,

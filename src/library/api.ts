@@ -18,6 +18,12 @@ export type LibraryState = {
   folders: FolderSummary[];
 };
 
+export type ImportedScene = {
+  fileName: string;
+  mimeType: string;
+  contents: number[];
+};
+
 export const libraryApi = {
   getState: () => invoke<LibraryState>("get_library_state"),
   chooseRoot: () => invoke<LibraryState>("choose_library_root"),
@@ -27,12 +33,13 @@ export const libraryApi = {
     invoke<string>("read_scene", { relativePath }),
   writeScene: (relativePath: string, sceneJson: string) =>
     invoke<void>("write_scene", { relativePath, sceneJson }),
+  exportFile: (suggestedName: string, extension: "png" | "svg", contents: Uint8Array) =>
+    invoke<void>("export_file", { suggestedName, extension, contents: [...contents] }),
   readThumbnail: (relativePath: string) =>
     invoke<string | null>("read_thumbnail", { relativePath }),
   writeThumbnail: (relativePath: string, thumbnailSvg: string) =>
     invoke<void>("write_thumbnail", { relativePath, thumbnailSvg }),
-  importDrawing: (parentPath: string) =>
-    invoke<DrawingSummary>("import_drawing", { parentPath }),
+  pickImportScene: () => invoke<ImportedScene>("pick_import_scene"),
   createDrawing: (parentPath: string, title: string) =>
     invoke<DrawingSummary>("create_drawing", { parentPath, title }),
   createFolder: (parentPath: string, name: string) =>

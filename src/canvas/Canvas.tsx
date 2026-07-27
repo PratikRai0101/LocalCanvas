@@ -1,9 +1,12 @@
 import {
   Excalidraw,
+  exportToBlob,
+  exportToSvg,
   loadFromBlob,
   serializeAsJSON,
 } from "@excalidraw/excalidraw";
 import type {
+  ExcalidrawImperativeAPI,
   ExcalidrawInitialDataState,
   ExcalidrawProps,
 } from "@excalidraw/excalidraw/types";
@@ -38,7 +41,9 @@ export function Canvas({
     useState<ExcalidrawInitialDataState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const latestScene = useRef<SceneSnapshot | null>(null);
+  const excalidrawApi = useRef<ExcalidrawImperativeAPI | null>(null);
   const saveTimer = useRef<number | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   const saveLatestScene = useCallback(async () => {
     const scene = latestScene.current;
@@ -109,6 +114,34 @@ export function Canvas({
     [saveLatestScene],
   );
 
+  const exportScene = useCallback(async (format: "png" | "svg") => {
+    const api = excalidrawApi.current;
+    if (!api) {
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const options = {
+        elements: api.getSceneElements(),
+        // Excalidraw embeds the source scene only when this flag is set,
+        // making the exported PNG/SVG reopenable rather than a flat image.
+        appState: { ...api.getAppState(), exportEmbedScene: true },
+        files: api.getFiles(),
+        exportPadding: 10,
+      };
+      const contents = format === "png"
+        ? new Uint8Array(await (await exportToBlob({ ...options, mimeType: "image/png" })).arrayBuffer())
+        : new TextEncoder().encode(new XMLSerializer().serializeToString(await exportToSvg(options)));
+      await libraryApi.exportFile(drawingTitle, format, contents);
+    } catch (error) {
+      console.error(`Failed to export ${format}`, error);
+      onSaveStatus("error");
+    } finally {
+      setIsExporting(false);
+    }
+  }, [drawingTitle, onSaveStatus]);
+
   const scheduleAutosave = useCallback(
     (...change: SceneChange) => {
       latestScene.current = {
@@ -143,8 +176,17 @@ export function Canvas({
 
   return (
     <div className="canvas-host">
+      <div className="canvas-export-actions">
+        <button type="button" onClick={() => void exportScene("png")} disabled={isExporting}>
+          Export PNG
+        </button>
+        <button type="button" onClick={() => void exportScene("svg")} disabled={isExporting}>
+          Export SVG
+        </button>
+      </div>
       <Excalidraw
         autoFocus
+        excalidrawAPI={(api) => { excalidrawApi.current = api; }}
         initialData={initialData}
         name={drawingTitle}
         onChange={scheduleAutosave}
