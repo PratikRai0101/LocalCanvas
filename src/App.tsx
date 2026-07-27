@@ -47,6 +47,8 @@ function App() {
   const [editTarget, setEditTarget] = useState<ContextTarget | null>(null);
   const [editAction, setEditAction] = useState<"rename" | "move" | null>(null);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [tagTarget, setTagTarget] = useState<ContextTarget | null>(null);
+  const [tagInput, setTagInput] = useState("");
 
   const refreshLibrary = useCallback(async () => {
     try {
@@ -266,6 +268,37 @@ function App() {
       x: Math.min(event.clientX, window.innerWidth - 190),
       y: Math.min(event.clientY, window.innerHeight - 54),
     });
+  }
+
+  async function openTagDialog() {
+    if (!contextTarget || contextTarget.kind !== "drawing") {
+      return;
+    }
+    const target = contextTarget;
+    setContextTarget(null);
+    try {
+      const tags = await libraryApi.getDrawingTags(target.path);
+      setTagInput(tags.join(", "));
+      setTagTarget(target);
+    } catch (cause) {
+      setError(asMessage(cause, "Couldn’t read Finder tags."));
+    }
+  }
+
+  async function saveTags(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!tagTarget) {
+      return;
+    }
+    setIsCreating(true);
+    try {
+      await libraryApi.setDrawingTags(tagTarget.path, tagInput.split(","));
+      setTagTarget(null);
+    } catch (cause) {
+      setError(asMessage(cause, "Couldn’t save Finder tags."));
+    } finally {
+      setIsCreating(false);
+    }
   }
 
   async function deleteContextTarget() {
@@ -573,10 +606,29 @@ function App() {
         >
           <button type="button" role="menuitem" onClick={() => openEditDialog("rename")}>Rename…</button>
           <button type="button" role="menuitem" onClick={() => openEditDialog("move")}>Move to…</button>
+          {contextTarget.kind === "drawing" && <button type="button" role="menuitem" onClick={() => void openTagDialog()}>Edit Finder tags…</button>}
           <div className="context-menu-separator" />
           <button type="button" role="menuitem" className="context-menu-danger" onClick={() => void deleteContextTarget()}>
             Delete {contextTarget.kind === "drawing" ? "drawing" : "folder"}
           </button>
+        </div>
+      )}
+
+      {tagTarget && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => !isCreating && setTagTarget(null)}>
+          <form className="creation-dialog" onSubmit={saveTags} onMouseDown={(event) => event.stopPropagation()}>
+            <p className="dialog-eyebrow">FINDER TAGS</p>
+            <h2>Tag {tagTarget.label}</h2>
+            <label>
+              Tags
+              <input autoFocus value={tagInput} onChange={(event) => setTagInput(event.currentTarget.value)} placeholder="Work, Architecture" />
+            </label>
+            <p className="tag-dialog-help">Separate tags with commas. They appear in Finder too.</p>
+            <div className="dialog-actions">
+              <button className="button button-secondary" type="button" onClick={() => setTagTarget(null)} disabled={isCreating}>Cancel</button>
+              <button className="button button-primary" type="submit" disabled={isCreating}>{isCreating ? "Saving…" : "Save tags"}</button>
+            </div>
+          </form>
         </div>
       )}
 
