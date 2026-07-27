@@ -26,6 +26,10 @@ export const libraryApi = {
     invoke<string>("read_scene", { relativePath }),
   writeScene: (relativePath: string, sceneJson: string) =>
     invoke<void>("write_scene", { relativePath, sceneJson }),
+  readThumbnail: (relativePath: string) =>
+    invoke<string | null>("read_thumbnail", { relativePath }),
+  writeThumbnail: (relativePath: string, thumbnailSvg: string) =>
+    invoke<void>("write_thumbnail", { relativePath, thumbnailSvg }),
   createDrawing: (parentPath: string, title: string) =>
     invoke<DrawingSummary>("create_drawing", { parentPath, title }),
   createFolder: (parentPath: string, name: string) =>

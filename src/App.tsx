@@ -6,6 +6,7 @@ import {
   LibraryState,
   libraryApi,
 } from "./library/api";
+import { ThumbnailGrid } from "./library/ThumbnailGrid";
 import "./App.css";
 
 type DialogKind = "drawing" | "folder" | null;
@@ -152,6 +153,11 @@ function App() {
     setError(null);
   }
 
+  function browseFolder(path: string) {
+    setSelectedFolderPath(path);
+    setActiveDrawing(null);
+  }
+
   const activeFolderLabel = selectedFolderPath || "Library root";
 
   return (
@@ -208,7 +214,7 @@ function App() {
               <button
                 className={`tree-item tree-folder ${selectedFolderPath === "" ? "is-selected" : ""}`}
                 type="button"
-                onClick={() => setSelectedFolderPath("")}
+                onClick={() => browseFolder("")}
               >
                 <span className="tree-icon">⌄</span>
                 <span className="tree-label">All drawings</span>
@@ -219,7 +225,7 @@ function App() {
                   folder={folder}
                   key={folder.path}
                   selected={folder.path === selectedFolderPath}
-                  onSelect={() => setSelectedFolderPath(folder.path)}
+                  onSelect={() => browseFolder(folder.path)}
                 />
               ))}
               <div className="tree-drawings">
@@ -317,6 +323,8 @@ function App() {
             onSaveStatus={setSaveStatus}
             onSaved={handleCanvasSaved}
           />
+        ) : library.drawings.length ? (
+          <ThumbnailGrid drawings={visibleDrawings} onSelect={selectDrawing} />
         ) : (
           <LibraryEmpty
             drawingCount={library.drawings.length}

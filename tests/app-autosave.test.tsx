@@ -42,6 +42,9 @@ vi.mock("../src/canvas/Canvas", () => ({
 }));
 
 vi.mock("../src/library/api", () => ({ libraryApi }));
+vi.mock("../src/library/ThumbnailGrid", () => ({
+  ThumbnailGrid: () => <div />,
+}));
 
 import App from "../src/App";
 
