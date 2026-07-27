@@ -36,6 +36,10 @@ export const libraryApi = {
     invoke<DrawingSummary>("create_drawing", { parentPath, title }),
   createFolder: (parentPath: string, name: string) =>
     invoke<FolderSummary>("create_folder", { parentPath, name }),
+  getDrawingTags: (relativePath: string) =>
+    invoke<string[]>("get_drawing_tags", { relativePath }),
+  setDrawingTags: (relativePath: string, tags: string[]) =>
+    invoke<void>("set_drawing_tags", { relativePath, tags }),
   deleteDrawing: (relativePath: string) =>
     invoke<void>("delete_drawing", { relativePath }),
   deleteFolder: (relativePath: string) =>

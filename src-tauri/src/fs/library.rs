@@ -14,6 +14,7 @@ use walkdir::{DirEntry, WalkDir};
 const LOCALCANVAS_DIR: &str = ".localcanvas";
 const SETTINGS_FILE: &str = "settings.json";
 const THUMBNAIL_DIR: &str = "thumbnails";
+const FINDER_TAG_ATTRIBUTE: &str = "com.apple.metadata:_kMDItemUserTags";
 
 pub type CommandResult<T> = Result<T, String>;
 
@@ -201,6 +202,50 @@ pub fn create_folder(
 
     fs::create_dir(&folder).map_err(|error| format!("Couldn't create folder: {error}"))?;
     folder_summary(&root, &folder)
+}
+
+pub fn drawing_tags(app: &AppHandle, relative_path: &str) -> CommandResult<Vec<String>> {
+    let root = active_library_root(app)?;
+    let path = resolve_existing_drawing_path(&root, relative_path)?;
+    let Some(encoded) = xattr::get(path, FINDER_TAG_ATTRIBUTE)
+        .map_err(|error| format!("Couldn't read Finder tags: {error}"))?
+    else {
+        return Ok(Vec::new());
+    };
+    let tags = plist::from_bytes::<Vec<String>>(&encoded)
+        .map_err(|error| format!("Couldn't read Finder tags: {error}"))?;
+    Ok(tags.into_iter().map(strip_finder_tag_color).collect())
+}
+
+pub fn set_drawing_tags(
+    app: &AppHandle,
+    relative_path: &str,
+    tags: Vec<String>,
+) -> CommandResult<()> {
+    let root = active_library_root(app)?;
+    let path = resolve_existing_drawing_path(&root, relative_path)?;
+    let tags = normalize_tags(tags)?;
+    if tags.is_empty() {
+        return xattr::remove(path, FINDER_TAG_ATTRIBUTE)
+            .or_else(|error| {
+                if error.kind() == std::io::ErrorKind::NotFound {
+                    Ok(())
+                } else {
+                    Err(error)
+                }
+            })
+            .map_err(|error| format!("Couldn't remove Finder tags: {error}"));
+    }
+
+    let finder_tags = tags
+        .into_iter()
+        .map(|tag| format!("{tag}\n0"))
+        .collect::<Vec<_>>();
+    let mut encoded = Vec::new();
+    plist::to_writer_binary(&mut encoded, &finder_tags)
+        .map_err(|error| format!("Couldn't save Finder tags: {error}"))?;
+    xattr::set(path, FINDER_TAG_ATTRIBUTE, &encoded)
+        .map_err(|error| format!("Couldn't save Finder tags: {error}"))
 }
 
 pub fn delete_drawing(app: &AppHandle, relative_path: &str) -> CommandResult<()> {
@@ -488,6 +533,31 @@ fn folder_name(name: &str) -> CommandResult<String> {
     let name = name.trim();
     validate_name(name, "Folder name")?;
     Ok(name.to_owned())
+}
+
+fn normalize_tags(tags: Vec<String>) -> CommandResult<Vec<String>> {
+    let mut normalized = Vec::new();
+    for tag in tags {
+        let tag = tag.trim();
+        if tag.is_empty() {
+            continue;
+        }
+        if tag.contains(['\n', '\r']) || tag.len() > 64 {
+            return Err("Tags must be one line and at most 64 characters.".to_owned());
+        }
+        if !normalized
+            .iter()
+            .any(|existing: &String| existing.eq_ignore_ascii_case(tag))
+        {
+            normalized.push(tag.to_owned());
+        }
+    }
+    Ok(normalized)
+}
+
+fn strip_finder_tag_color(tag: String) -> String {
+    tag.split_once('\n')
+        .map_or(tag.clone(), |(name, _)| name.to_owned())
 }
 
 fn validate_name(name: &str, label: &str) -> CommandResult<()> {

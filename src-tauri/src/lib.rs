@@ -99,6 +99,8 @@ pub fn run() {
             commands::import_drawing,
             commands::create_drawing,
             commands::create_folder,
+            commands::get_drawing_tags,
+            commands::set_drawing_tags,
             commands::delete_drawing,
             commands::delete_folder,
             commands::rename_drawing,

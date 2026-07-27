@@ -17,7 +17,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 rusqlite = { version = "0.40", features = ["bundled"] }
 notify = "8"
+plist = "1"
 sha2 = "0.11"
+xattr = "1"
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 uuid = { version = "1", features = ["v4"] }

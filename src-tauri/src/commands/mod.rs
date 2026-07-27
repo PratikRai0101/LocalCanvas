@@ -119,6 +119,20 @@ pub fn create_folder(
 }
 
 #[tauri::command]
+pub fn get_drawing_tags(app: AppHandle, relative_path: String) -> CommandResult<Vec<String>> {
+    library::drawing_tags(&app, &relative_path)
+}
+
+#[tauri::command]
+pub fn set_drawing_tags(
+    app: AppHandle,
+    relative_path: String,
+    tags: Vec<String>,
+) -> CommandResult<()> {
+    library::set_drawing_tags(&app, &relative_path, tags)
+}
+
+#[tauri::command]
 pub fn delete_drawing(app: AppHandle, relative_path: String) -> CommandResult<()> {
     library::delete_drawing(&app, &relative_path)
 }
