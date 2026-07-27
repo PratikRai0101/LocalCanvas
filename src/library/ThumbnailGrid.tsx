@@ -1,16 +1,20 @@
 import { exportToSvg, loadFromBlob } from "@excalidraw/excalidraw";
-import { useEffect, useState } from "react";
+import { MouseEvent, useEffect, useState } from "react";
 import type { DrawingSummary } from "./api";
 import { libraryApi } from "./api";
 
 type ThumbnailGridProps = {
   drawings: DrawingSummary[];
   onSelect: (drawing: DrawingSummary) => void;
+  onContextMenu: (
+    event: MouseEvent<HTMLButtonElement>,
+    target: { kind: "drawing"; path: string; label: string },
+  ) => void;
 };
 
 type ThumbnailUrls = Record<string, string | null>;
 
-export function ThumbnailGrid({ drawings, onSelect }: ThumbnailGridProps) {
+export function ThumbnailGrid({ drawings, onSelect, onContextMenu }: ThumbnailGridProps) {
   const [thumbnailUrls, setThumbnailUrls] = useState<ThumbnailUrls>({});
 
   useEffect(() => {
@@ -64,6 +68,11 @@ export function ThumbnailGrid({ drawings, onSelect }: ThumbnailGridProps) {
             key={drawing.path}
             type="button"
             onClick={() => onSelect(drawing)}
+            onContextMenu={(event) => onContextMenu(event, {
+              kind: "drawing",
+              path: drawing.path,
+              label: drawing.title,
+            })}
           >
             <span className="drawing-thumbnail">
               {thumbnailUrls[drawing.path] ? (

@@ -14,8 +14,15 @@ const libraryApi = vi.hoisted(() => ({
   searchDrawings: vi.fn(),
   readScene: vi.fn(),
   writeScene: vi.fn(),
+  importDrawing: vi.fn(),
   createDrawing: vi.fn(),
   createFolder: vi.fn(),
+  deleteDrawing: vi.fn(),
+  deleteFolder: vi.fn(),
+  renameDrawing: vi.fn(),
+  renameFolder: vi.fn(),
+  moveDrawing: vi.fn(),
+  moveFolder: vi.fn(),
 }));
 
 vi.mock("../src/canvas/Canvas", () => ({
@@ -64,10 +71,17 @@ describe("App autosave wiring", () => {
   beforeEach(() => {
     canvasProps.length = 0;
     libraryApi.getState.mockReset();
+    libraryApi.importDrawing.mockReset();
+    libraryApi.deleteDrawing.mockReset();
+    libraryApi.deleteFolder.mockReset();
+    libraryApi.renameDrawing.mockReset();
+    libraryApi.renameFolder.mockReset();
+    libraryApi.moveDrawing.mockReset();
+    libraryApi.moveFolder.mockReset();
     libraryApi.getState.mockResolvedValue(library);
   });
 
-  it("keeps Canvas's post-save callback stable when save status changes", async () => {
+  it("keeps Canvas's post-save callback stable when an autosave completes", async () => {
     render(<App />);
 
     fireEvent.click(await screen.findByTitle("test.excalidraw"));
@@ -76,7 +90,39 @@ describe("App autosave wiring", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Simulate completed autosave" }));
 
-    await waitFor(() => expect(canvasProps).toHaveLength(2));
-    expect(canvasProps[1].onSaved).toBe(canvasProps[0].onSaved);
+    await waitFor(() => expect(libraryApi.getState).toHaveBeenCalledTimes(2));
+    expect(canvasProps).toHaveLength(1);
+  });
+
+  it("imports an existing Excalidraw file into the selected library folder", async () => {
+    libraryApi.importDrawing.mockResolvedValue(drawing);
+    render(<App />);
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "Import existing Excalidraw drawing" })).at(-1)!);
+
+    await waitFor(() => expect(libraryApi.importDrawing).toHaveBeenCalledWith(""));
+  });
+
+  it("renames a drawing from its app context menu", async () => {
+    libraryApi.renameDrawing.mockResolvedValue({ ...drawing, path: "renamed.excalidraw", title: "renamed" });
+    render(<App />);
+
+    fireEvent.contextMenu((await screen.findAllByTitle("test.excalidraw")).at(-1)!);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Rename…" }));
+    fireEvent.change(screen.getByLabelText("Drawing name"), { target: { value: "renamed" } });
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+
+    await waitFor(() => expect(libraryApi.renameDrawing).toHaveBeenCalledWith("test.excalidraw", "renamed"));
+  });
+
+  it("offers a destructive action instead of the WebView context menu", async () => {
+    libraryApi.deleteDrawing.mockResolvedValue(undefined);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<App />);
+
+    fireEvent.contextMenu((await screen.findAllByTitle("test.excalidraw")).at(-1)!);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete drawing" }));
+
+    await waitFor(() => expect(libraryApi.deleteDrawing).toHaveBeenCalledWith("test.excalidraw"));
   });
 });

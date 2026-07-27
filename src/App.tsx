@@ -1,4 +1,5 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
+import { FormEvent, MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Canvas, SaveStatus } from "./canvas/Canvas";
 import {
   DrawingSummary,
@@ -10,6 +11,13 @@ import { ThumbnailGrid } from "./library/ThumbnailGrid";
 import "./App.css";
 
 type DialogKind = "drawing" | "folder" | null;
+type ContextTarget = {
+  kind: "drawing" | "folder";
+  path: string;
+  label: string;
+  x: number;
+  y: number;
+};
 
 const EMPTY_LIBRARY: LibraryState = {
   root: null,
@@ -29,7 +37,14 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<DrawingSummary[] | null>(null);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
+  const handleSaveStatus = useCallback((status: SaveStatus) => {
+    if (status === "error") {
+      setError("Couldn’t save this drawing. Your latest changes may not be on disk.");
+    }
+  }, []);
+  const [contextTarget, setContextTarget] = useState<ContextTarget | null>(null);
+  const [editTarget, setEditTarget] = useState<ContextTarget | null>(null);
+  const [editAction, setEditAction] = useState<"rename" | "move" | null>(null);
 
   const refreshLibrary = useCallback(async () => {
     try {
@@ -89,6 +104,27 @@ function App() {
     void refreshLibrary();
   }, [refreshLibrary]);
 
+  async function importExistingDrawing() {
+    if (!library.root) {
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      const drawing = await libraryApi.importDrawing(selectedFolderPath);
+      const nextLibrary = await refreshLibrary();
+      setActiveDrawing(nextLibrary.drawings.find((item) => item.path === drawing.path) ?? drawing);
+      setSelectedFolderPath(parentPath(drawing.path));
+    } catch (cause) {
+      const message = asMessage(cause, "Couldn’t import the drawing.");
+      if (message !== "No drawing was selected.") {
+        setError(message);
+      }
+    } finally {
+      setIsCreating(false);
+    }
+  }
+
   async function chooseLibraryRoot() {
     setIsChoosingRoot(true);
     try {
@@ -117,6 +153,66 @@ function App() {
     }
   }
 
+  function openEditDialog(action: "rename" | "move") {
+    if (!contextTarget) {
+      return;
+    }
+    const target = contextTarget;
+    setContextTarget(null);
+    setEditTarget(target);
+    setEditAction(action);
+    setNewItemName(target.label);
+    setNewItemFolder(parentPath(target.path));
+    setError(null);
+  }
+
+  function closeEditDialog() {
+    if (!isCreating) {
+      setEditTarget(null);
+      setEditAction(null);
+    }
+  }
+
+  async function updateItem(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editTarget || !editAction) {
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      const result = editAction === "rename"
+        ? editTarget.kind === "drawing"
+          ? await libraryApi.renameDrawing(editTarget.path, newItemName)
+          : await libraryApi.renameFolder(editTarget.path, newItemName)
+        : editTarget.kind === "drawing"
+          ? await libraryApi.moveDrawing(editTarget.path, newItemFolder)
+          : await libraryApi.moveFolder(editTarget.path, newItemFolder);
+      const nextLibrary = await refreshLibrary();
+
+      if (editTarget.kind === "drawing" && activeDrawing?.path === editTarget.path) {
+        const updatedDrawing = nextLibrary.drawings.find((drawing) => drawing.path === result.path);
+        setActiveDrawing(updatedDrawing ?? null);
+        setSelectedFolderPath(parentPath(result.path));
+      }
+      if (editTarget.kind === "folder") {
+        if (selectedFolderPath === editTarget.path || selectedFolderPath.startsWith(`${editTarget.path}/`)) {
+          setSelectedFolderPath(`${result.path}${selectedFolderPath.slice(editTarget.path.length)}`);
+        }
+        if (activeDrawing?.path.startsWith(`${editTarget.path}/`)) {
+          const nextPath = `${result.path}${activeDrawing.path.slice(editTarget.path.length)}`;
+          setActiveDrawing(nextLibrary.drawings.find((drawing) => drawing.path === nextPath) ?? null);
+        }
+      }
+      setEditTarget(null);
+      setEditAction(null);
+    } catch (cause) {
+      setError(asMessage(cause, `Couldn’t ${editAction} ${editTarget.kind}.`));
+    } finally {
+      setIsCreating(false);
+    }
+  }
+
   async function createItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!dialogKind) {
@@ -132,7 +228,7 @@ function App() {
           nextLibrary.drawings.find((item) => item.path === drawing.path) ?? drawing,
         );
         setSelectedFolderPath(parentPath(drawing.path));
-        setSaveStatus("saved");
+        handleSaveStatus("saved");
       } else {
         const folder = await libraryApi.createFolder(newItemFolder, newItemName);
         await refreshLibrary();
@@ -149,7 +245,7 @@ function App() {
   function selectDrawing(drawing: DrawingSummary) {
     setActiveDrawing(drawing);
     setSelectedFolderPath(parentPath(drawing.path));
-    setSaveStatus("saved");
+    handleSaveStatus("saved");
     setError(null);
   }
 
@@ -158,17 +254,117 @@ function App() {
     setActiveDrawing(null);
   }
 
+  function openContextMenu(
+    event: MouseEvent<HTMLButtonElement>,
+    target: Omit<ContextTarget, "x" | "y">,
+  ) {
+    event.preventDefault();
+    setContextTarget({
+      ...target,
+      x: Math.min(event.clientX, window.innerWidth - 190),
+      y: Math.min(event.clientY, window.innerHeight - 54),
+    });
+  }
+
+  async function deleteContextTarget() {
+    if (!contextTarget) {
+      return;
+    }
+
+    const { kind, path, label } = contextTarget;
+    setContextTarget(null);
+    const description = kind === "drawing" ? `drawing “${label}”` : `folder “${label}” and all of its contents`;
+    if (!window.confirm(`Delete ${description}? This can’t be undone.`)) {
+      return;
+    }
+
+    try {
+      if (kind === "drawing") {
+        await libraryApi.deleteDrawing(path);
+        if (activeDrawing?.path === path) {
+          setActiveDrawing(null);
+        }
+      } else {
+        await libraryApi.deleteFolder(path);
+        if (activeDrawing?.path.startsWith(`${path}/`)) {
+          setActiveDrawing(null);
+        }
+        if (selectedFolderPath === path || selectedFolderPath.startsWith(`${path}/`)) {
+          setSelectedFolderPath("");
+        }
+      }
+      await refreshLibrary();
+    } catch (cause) {
+      setError(asMessage(cause, `Couldn’t delete ${kind}.`));
+    }
+  }
+
+  useEffect(() => {
+    function handleShortcut(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) {
+        return;
+      }
+      const target = event.target as HTMLElement | null;
+      if (target?.matches("input, textarea, select, [contenteditable='true']")) {
+        return;
+      }
+
+      if (event.key.toLowerCase() === "n" && library.root) {
+        event.preventDefault();
+        openDialog(event.shiftKey ? "folder" : "drawing");
+      }
+      if (event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        document.querySelector<HTMLInputElement>(".search-box input")?.focus();
+      }
+      if (event.key.toLowerCase() === "o" && library.root) {
+        event.preventDefault();
+        void importExistingDrawing();
+      }
+      if (event.key.toLowerCase() === "r" && activeDrawing) {
+        event.preventDefault();
+        setEditTarget({ kind: "drawing", path: activeDrawing.path, label: activeDrawing.title, x: 0, y: 0 });
+        setEditAction("rename");
+        setNewItemName(activeDrawing.title);
+        setError(null);
+      }
+    }
+
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [activeDrawing, library.root, selectedFolderPath]);
+
+  useEffect(() => {
+    if (!("__TAURI_INTERNALS__" in window)) {
+      return;
+    }
+
+    let unlisten: (() => void) | undefined;
+    void listen<string>("menu-action", ({ payload }) => {
+      if (payload === "import-drawing" && library.root) {
+        void importExistingDrawing();
+      } else if (payload === "new-drawing" && library.root) {
+        openDialog("drawing");
+      } else if (payload === "new-folder" && library.root) {
+        openDialog("folder");
+      } else if (payload === "rename-active" && activeDrawing) {
+        setEditTarget({ kind: "drawing", path: activeDrawing.path, label: activeDrawing.title, x: 0, y: 0 });
+        setEditAction("rename");
+        setNewItemName(activeDrawing.title);
+      } else if (payload === "command-palette") {
+        document.querySelector<HTMLInputElement>(".search-box input")?.focus();
+      }
+    }).then((stopListening) => {
+      unlisten = stopListening;
+    });
+    return () => unlisten?.();
+  }, [activeDrawing, library.root, selectedFolderPath]);
+
   const activeFolderLabel = selectedFolderPath || "Library root";
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" onContextMenu={(event) => event.preventDefault()} onClick={() => setContextTarget(null)}>
       <aside className="sidebar" aria-label="Library">
-        <div className="window-controls" aria-hidden="true">
-          <span className="traffic-light traffic-light-close" />
-          <span className="traffic-light traffic-light-minimize" />
-          <span className="traffic-light traffic-light-zoom" />
-        </div>
-
         <div className="brand-row">
           <span className="brand-mark">✦</span>
           <span>LocalCanvas</span>
@@ -182,6 +378,16 @@ function App() {
             disabled={!library.root}
           >
             <span>＋</span> New drawing
+          </button>
+          <button
+            className="icon-button"
+            type="button"
+            aria-label="Import existing Excalidraw drawing"
+            title="Import existing Excalidraw drawing"
+            onClick={() => void importExistingDrawing()}
+            disabled={!library.root || isCreating}
+          >
+            ↥
           </button>
           <button
             className="icon-button"
@@ -226,6 +432,7 @@ function App() {
                   key={folder.path}
                   selected={folder.path === selectedFolderPath}
                   onSelect={() => browseFolder(folder.path)}
+                  onContextMenu={(event) => openContextMenu(event, { kind: "folder", path: folder.path, label: folder.name })}
                 />
               ))}
               <div className="tree-drawings">
@@ -235,6 +442,7 @@ function App() {
                     key={drawing.path}
                     active={drawing.path === activeDrawing?.path}
                     onSelect={() => selectDrawing(drawing)}
+                    onContextMenu={(event) => openContextMenu(event, { kind: "drawing", path: drawing.path, label: drawing.title })}
                   />
                 ))}
               </div>
@@ -249,6 +457,7 @@ function App() {
                     key={drawing.path}
                     type="button"
                     onClick={() => selectDrawing(drawing)}
+                    onContextMenu={(event) => openContextMenu(event, { kind: "drawing", path: drawing.path, label: drawing.title })}
                   >
                     <span className="recent-thumbnail" aria-hidden="true">
                       <i />
@@ -272,19 +481,6 @@ function App() {
           </div>
         )}
 
-        <div className="sidebar-footer">
-          <button className="graph-button" disabled type="button" title="Graph view is coming next">
-            <span>◌</span> Graph view <small>soon</small>
-          </button>
-          <span className={`save-status save-status-${saveStatus}`}>
-            <i />
-            {saveStatus === "saving"
-              ? "Saving…"
-              : saveStatus === "error"
-                ? "Save failed"
-                : "All changes saved"}
-          </span>
-        </div>
       </aside>
 
       <section className="workspace">
@@ -320,11 +516,15 @@ function App() {
             key={activeDrawing.path}
             drawingPath={activeDrawing.path}
             drawingTitle={activeDrawing.title}
-            onSaveStatus={setSaveStatus}
+            onSaveStatus={handleSaveStatus}
             onSaved={handleCanvasSaved}
           />
         ) : library.drawings.length ? (
-          <ThumbnailGrid drawings={visibleDrawings} onSelect={selectDrawing} />
+          <ThumbnailGrid
+            drawings={visibleDrawings}
+            onSelect={selectDrawing}
+            onContextMenu={openContextMenu}
+          />
         ) : (
           <LibraryEmpty
             drawingCount={library.drawings.length}
@@ -332,6 +532,53 @@ function App() {
           />
         )}
       </section>
+
+      {contextTarget && (
+        <div
+          className="context-menu"
+          role="menu"
+          aria-label={`${contextTarget.label} actions`}
+          style={{ left: contextTarget.x, top: contextTarget.y }}
+          onClick={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          <button type="button" role="menuitem" onClick={() => openEditDialog("rename")}>Rename…</button>
+          <button type="button" role="menuitem" onClick={() => openEditDialog("move")}>Move to…</button>
+          <div className="context-menu-separator" />
+          <button type="button" role="menuitem" className="context-menu-danger" onClick={() => void deleteContextTarget()}>
+            Delete {contextTarget.kind === "drawing" ? "drawing" : "folder"}
+          </button>
+        </div>
+      )}
+
+      {editTarget && editAction && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={closeEditDialog}>
+          <form className="creation-dialog" onSubmit={updateItem} onMouseDown={(event) => event.stopPropagation()}>
+            <p className="dialog-eyebrow">{editAction === "rename" ? "RENAME" : "MOVE"} {editTarget.kind.toUpperCase()}</p>
+            <h2>{editAction === "rename" ? `Rename ${editTarget.label}` : `Move ${editTarget.label}`}</h2>
+            {editAction === "rename" ? (
+              <label>
+                {editTarget.kind === "drawing" ? "Drawing name" : "Folder name"}
+                <input autoFocus value={newItemName} onChange={(event) => setNewItemName(event.currentTarget.value)} onFocus={(event) => event.currentTarget.select()} />
+              </label>
+            ) : (
+              <label>
+                Destination
+                <select value={newItemFolder} onChange={(event) => setNewItemFolder(event.currentTarget.value)}>
+                  <option value="">Library root</option>
+                  {library.folders
+                    .filter((folder) => editTarget.kind !== "folder" || !folder.path.startsWith(`${editTarget.path}/`) && folder.path !== editTarget.path)
+                    .map((folder) => <option key={folder.path} value={folder.path}>{folder.path}</option>)}
+                </select>
+              </label>
+            )}
+            <div className="dialog-actions">
+              <button className="button button-secondary" type="button" onClick={closeEditDialog} disabled={isCreating}>Cancel</button>
+              <button className="button button-primary" type="submit" disabled={isCreating}>{isCreating ? "Working…" : editAction === "rename" ? "Rename" : "Move"}</button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {dialogKind && (
         <div className="modal-backdrop" role="presentation" onMouseDown={closeDialog}>
@@ -409,12 +656,18 @@ function LibraryEmpty({ drawingCount, onNewDrawing }: { drawingCount: number; on
   );
 }
 
-function FolderItem({ folder, selected, onSelect }: { folder: FolderSummary; selected: boolean; onSelect: () => void }) {
+function FolderItem({ folder, selected, onSelect, onContextMenu }: {
+  folder: FolderSummary;
+  selected: boolean;
+  onSelect: () => void;
+  onContextMenu: (event: MouseEvent<HTMLButtonElement>) => void;
+}) {
   return (
     <button
       className={`tree-item tree-folder ${selected ? "is-selected" : ""}`}
       type="button"
       onClick={onSelect}
+      onContextMenu={onContextMenu}
       style={{ paddingLeft: `${12 + folderDepth(folder.path) * 12}px` }}
     >
       <span className="tree-icon">›</span>
@@ -423,12 +676,18 @@ function FolderItem({ folder, selected, onSelect }: { folder: FolderSummary; sel
   );
 }
 
-function DrawingItem({ drawing, active, onSelect }: { drawing: DrawingSummary; active: boolean; onSelect: () => void }) {
+function DrawingItem({ drawing, active, onSelect, onContextMenu }: {
+  drawing: DrawingSummary;
+  active: boolean;
+  onSelect: () => void;
+  onContextMenu: (event: MouseEvent<HTMLButtonElement>) => void;
+}) {
   return (
     <button
       className={`tree-item tree-drawing ${active ? "is-active" : ""}`}
       type="button"
       onClick={onSelect}
+      onContextMenu={onContextMenu}
       style={{ paddingLeft: `${30 + folderDepth(parentPath(drawing.path)) * 12}px` }}
       title={drawing.path}
     >

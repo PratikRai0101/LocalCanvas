@@ -28,17 +28,11 @@ button:disabled { cursor: not-allowed; opacity: .5; }
   flex: 0 0 258px;
   flex-direction: column;
   min-width: 258px;
-  padding: 18px 12px 12px;
+  padding: 24px 12px 12px;
   color: #4a494d;
   background: #f7f6f4;
   border-right: 1px solid #e8e6e2;
 }
-
-.window-controls { display: flex; gap: 8px; height: 18px; padding-left: 5px; }
-.traffic-light { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, .1); }
-.traffic-light-close { background: #ff5f57; }
-.traffic-light-minimize { background: #febc2e; }
-.traffic-light-zoom { background: #28c840; }
 
 .brand-row {
   display: flex;
@@ -133,17 +127,6 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .sidebar-empty code { font-family: "DM Mono", monospace; font-size: 10px; }
 .sidebar-empty-library { margin-top: 25px; }
 
-.sidebar-footer { margin-top: auto; padding: 10px 4px 0; border-top: 1px solid #e5e3df; }
-.graph-button { width: 100%; padding: 7px 8px; color: #96939a; text-align: left; background: transparent; border: 0; border-radius: 5px; font-size: 12px; }
-.graph-button span { display: inline-block; width: 18px; color: #7773ca; font-size: 16px; vertical-align: -1px; }
-.graph-button small { float: right; margin-top: 2px; font-size: 9px; }
-.save-status { display: flex; align-items: center; gap: 5px; margin: 10px 8px 1px; color: #8c8990; font-size: 10px; }
-.save-status i { width: 6px; height: 6px; border-radius: 50%; background: #7fb083; }
-.save-status-saving i { background: #e2aa49; animation: pulse 1.1s ease infinite; }
-.save-status-error { color: #b54f51; }
-.save-status-error i { background: #d75a5d; }
-@keyframes pulse { 50% { opacity: .35; } }
-
 .workspace { position: relative; display: flex; min-width: 0; flex: 1; flex-direction: column; overflow: hidden; background: #fefefe; }
 .workspace-header { display: flex; align-items: center; justify-content: space-between; flex: 0 0 58px; gap: 20px; padding: 0 24px; border-bottom: 1px solid #ecebed; background: rgba(255, 255, 255, .94); }
 .breadcrumb { display: flex; min-width: 0; gap: 8px; color: #97949a; overflow: hidden; font-size: 12px; }
@@ -182,6 +165,30 @@ kbd { padding: 1px 4px; color: #9e9ba1; background: #fff; border: 1px solid #e4e
 .creation-dialog label { display: grid; gap: 7px; margin-top: 13px; color: #69666d; font-size: 11px; font-weight: 600; }
 .creation-dialog input, .creation-dialog select { width: 100%; height: 36px; padding: 0 10px; color: #39373d; background: #fff; border: 1px solid #d8d5dc; border-radius: 6px; outline-color: #6965db; font-size: 13px; font-weight: 400; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 23px; }
+
+.context-menu {
+  position: fixed;
+  z-index: 30;
+  min-width: 180px;
+  padding: 4px;
+  background: rgba(43, 42, 46, .98);
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: 7px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .28);
+}
+.context-menu button {
+  width: 100%;
+  padding: 7px 9px;
+  color: #f6f5f7;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.context-menu button:hover { background: rgba(255, 255, 255, .12); }
+.context-menu-separator { height: 1px; margin: 4px 2px; background: rgba(255, 255, 255, .12); }
+.context-menu .context-menu-danger { color: #ff8d91; }
 
 @media (max-width: 780px) {
   .sidebar { flex-basis: 205px; min-width: 205px; }
