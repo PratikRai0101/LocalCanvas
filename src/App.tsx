@@ -636,6 +636,7 @@ function App() {
             drawingTitle={activeDrawing.title}
             onSaveStatus={handleSaveStatus}
             onSaved={handleCanvasSaved}
+            portalTargets={library.drawings.filter((drawing) => drawing.path !== activeDrawing.path)}
           />
         ) : library.drawings.length ? (
           <ThumbnailGrid

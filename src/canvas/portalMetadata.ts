@@ -17,6 +17,12 @@ export type DrawingIdentity = {
   wasCreated: boolean;
 };
 
+export type PortalTarget = {
+  drawingId: string;
+  path: string;
+  title: string;
+};
+
 export function ensureDrawingIdentity(elements: readonly ExcalidrawElement[]): DrawingIdentity {
   const existingDrawingId = findDrawingId(elements);
   if (existingDrawingId) {
@@ -44,6 +50,27 @@ export function ensureDrawingIdentity(elements: readonly ExcalidrawElement[]): D
   // and survives upstream serialization without appearing on canvas.
   // This gives the scene a durable identity without a custom scene-level field.
   return { drawingId, elements: [...elements, marker], wasCreated: true };
+}
+
+export function createPortalElements(target: PortalTarget, x = 100, y = 100) {
+  return convertToExcalidrawElements([{
+    type: "rectangle",
+    x,
+    y,
+    width: 240,
+    height: 72,
+    strokeColor: "#6965db",
+    backgroundColor: "#eeedff",
+    fillStyle: "solid",
+    customData: {
+      [LOCALCANVAS_KEY]: {
+        kind: "portal",
+        targetId: target.drawingId,
+        targetPath: target.path,
+      },
+    },
+    label: { text: target.title },
+  }], { regenerateIds: false });
 }
 
 export function findDrawingId(elements: readonly ElementWithCustomData[]): string | null {

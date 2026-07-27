@@ -11,14 +11,15 @@ import type {
   ExcalidrawProps,
 } from "@excalidraw/excalidraw/types";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { libraryApi } from "../library/api";
-import { ensureDrawingIdentity } from "./portalMetadata";
+import { DrawingSummary, libraryApi } from "../library/api";
+import { createPortalElements, ensureDrawingIdentity } from "./portalMetadata";
 
 type CanvasProps = {
   drawingPath: string;
   drawingTitle: string;
   onSaveStatus: (status: SaveStatus) => void;
   onSaved: () => void;
+  portalTargets: DrawingSummary[];
 };
 
 export type SaveStatus = "saved" | "saving" | "error";
@@ -37,6 +38,7 @@ export function Canvas({
   drawingTitle,
   onSaveStatus,
   onSaved,
+  portalTargets,
 }: CanvasProps) {
   const [initialData, setInitialData] =
     useState<ExcalidrawInitialDataState | null>(null);
@@ -45,6 +47,9 @@ export function Canvas({
   const excalidrawApi = useRef<ExcalidrawImperativeAPI | null>(null);
   const saveTimer = useRef<number | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isPortalPickerOpen, setIsPortalPickerOpen] = useState(false);
+  const [portalTargetPath, setPortalTargetPath] = useState("");
+  const [isCreatingPortal, setIsCreatingPortal] = useState(false);
 
   const saveLatestScene = useCallback(async () => {
     const scene = latestScene.current;
@@ -150,6 +155,47 @@ export function Canvas({
     }
   }, [drawingTitle, onSaveStatus]);
 
+  const createPortal = useCallback(async () => {
+    const api = excalidrawApi.current;
+    const target = portalTargets.find((drawing) => drawing.path === portalTargetPath);
+    if (!api || !target) {
+      return;
+    }
+
+    setIsCreatingPortal(true);
+    try {
+      const targetContents = await libraryApi.readScene(target.path);
+      const targetScene = await loadFromBlob(
+        new Blob([targetContents], { type: "application/json" }),
+        null,
+        null,
+      );
+      const targetIdentity = ensureDrawingIdentity(targetScene.elements);
+      if (targetIdentity.wasCreated) {
+        await libraryApi.writeScene(
+          target.path,
+          serializeAsJSON(targetIdentity.elements, targetScene.appState, targetScene.files, "local"),
+        );
+      }
+
+      const currentElements = api.getSceneElementsIncludingDeleted();
+      const sourceIdentity = ensureDrawingIdentity(currentElements);
+      const portalElements = createPortalElements({
+        drawingId: targetIdentity.drawingId,
+        path: target.path,
+        title: target.title,
+      });
+      api.updateScene({ elements: [...sourceIdentity.elements, ...portalElements] });
+      setIsPortalPickerOpen(false);
+      setPortalTargetPath("");
+    } catch (error) {
+      console.error("Failed to create portal", error);
+      onSaveStatus("error");
+    } finally {
+      setIsCreatingPortal(false);
+    }
+  }, [onSaveStatus, portalTargetPath, portalTargets]);
+
   const scheduleAutosave = useCallback(
     (...change: SceneChange) => {
       latestScene.current = {
@@ -185,6 +231,9 @@ export function Canvas({
   return (
     <div className="canvas-host">
       <div className="canvas-export-actions">
+        <button type="button" onClick={() => setIsPortalPickerOpen(true)} disabled={!portalTargets.length}>
+          Create portal
+        </button>
         <button type="button" onClick={() => void exportScene("png")} disabled={isExporting}>
           Export PNG
         </button>
@@ -192,6 +241,23 @@ export function Canvas({
           Export SVG
         </button>
       </div>
+      {isPortalPickerOpen && (
+        <div className="portal-picker" role="dialog" aria-label="Create portal">
+          <label>
+            Link to drawing
+            <select autoFocus value={portalTargetPath} onChange={(event) => setPortalTargetPath(event.currentTarget.value)}>
+              <option value="">Choose a drawing</option>
+              {portalTargets.map((target) => <option key={target.path} value={target.path}>{target.path}</option>)}
+            </select>
+          </label>
+          <div>
+            <button type="button" onClick={() => setIsPortalPickerOpen(false)} disabled={isCreatingPortal}>Cancel</button>
+            <button type="button" onClick={() => void createPortal()} disabled={!portalTargetPath || isCreatingPortal}>
+              {isCreatingPortal ? "Creating…" : "Create portal"}
+            </button>
+          </div>
+        </div>
+      )}
       <Excalidraw
         autoFocus
         excalidrawAPI={(api) => { excalidrawApi.current = api; }}
