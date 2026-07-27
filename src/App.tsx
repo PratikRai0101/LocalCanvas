@@ -84,6 +84,9 @@ function App() {
   }, [library.drawings, query, searchResults, selectedFolderPath]);
 
   const recentDrawings = library.drawings.slice(0, 6);
+  const handleCanvasSaved = useCallback(() => {
+    void refreshLibrary();
+  }, [refreshLibrary]);
 
   async function chooseLibraryRoot() {
     setIsChoosingRoot(true);
@@ -312,7 +315,7 @@ function App() {
             drawingPath={activeDrawing.path}
             drawingTitle={activeDrawing.title}
             onSaveStatus={setSaveStatus}
-            onSaved={() => void refreshLibrary()}
+            onSaved={handleCanvasSaved}
           />
         ) : (
           <LibraryEmpty
