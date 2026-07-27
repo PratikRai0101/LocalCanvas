@@ -8,6 +8,7 @@ import {
   libraryApi,
 } from "./library/api";
 import { ThumbnailGrid } from "./library/ThumbnailGrid";
+import { CommandPalette } from "./search/CommandPalette";
 import "./App.css";
 
 type DialogKind = "drawing" | "folder" | null;
@@ -45,6 +46,7 @@ function App() {
   const [contextTarget, setContextTarget] = useState<ContextTarget | null>(null);
   const [editTarget, setEditTarget] = useState<ContextTarget | null>(null);
   const [editAction, setEditAction] = useState<"rename" | "move" | null>(null);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
   const refreshLibrary = useCallback(async () => {
     try {
@@ -315,7 +317,7 @@ function App() {
       }
       if (event.key.toLowerCase() === "k") {
         event.preventDefault();
-        document.querySelector<HTMLInputElement>(".search-box input")?.focus();
+        setIsCommandPaletteOpen(true);
       }
       if (event.key.toLowerCase() === "o" && library.root) {
         event.preventDefault();
@@ -352,7 +354,7 @@ function App() {
         setEditAction("rename");
         setNewItemName(activeDrawing.title);
       } else if (payload === "command-palette") {
-        document.querySelector<HTMLInputElement>(".search-box input")?.focus();
+        setIsCommandPaletteOpen(true);
       }
     }).then((stopListening) => {
       unlisten = stopListening;
@@ -532,6 +534,19 @@ function App() {
           />
         )}
       </section>
+
+      {isCommandPaletteOpen && (
+        <CommandPalette
+          drawings={library.drawings}
+          folders={library.folders}
+          onOpenDrawing={selectDrawing}
+          onOpenFolder={browseFolder}
+          onNewDrawing={() => openDialog("drawing")}
+          onNewFolder={() => openDialog("folder")}
+          onImportDrawing={() => void importExistingDrawing()}
+          onClose={() => setIsCommandPaletteOpen(false)}
+        />
+      )}
 
       {contextTarget && (
         <div
