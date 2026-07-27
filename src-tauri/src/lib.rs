@@ -1,6 +1,7 @@
 mod commands;
 mod fs;
 mod index;
+mod watcher;
 
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder},
@@ -10,6 +11,7 @@ use tauri::{
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .manage(watcher::LibraryWatcher::default())
         .setup(|app| {
             let new_drawing = MenuItemBuilder::with_id("new-drawing", "New Drawing")
                 .accelerator("CmdOrCtrl+N")

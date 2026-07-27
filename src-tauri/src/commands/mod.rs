@@ -3,13 +3,19 @@ use crate::{
     index::{self, IndexStats},
 };
 use std::path::PathBuf;
-use tauri::AppHandle;
+use tauri::{AppHandle, State};
+
+use crate::watcher::{self, LibraryWatcher};
 use tauri_plugin_dialog::DialogExt;
 
 #[tauri::command]
-pub fn get_library_state(app: AppHandle) -> CommandResult<LibraryState> {
+pub fn get_library_state(
+    app: AppHandle,
+    watcher: State<LibraryWatcher>,
+) -> CommandResult<LibraryState> {
     let state = library::get_library_state(&app)?;
     if let Ok(root) = library::active_library_root(&app) {
+        let _ = watcher::watch_library(&app, &watcher, &root);
         // A broken cache must never prevent library browsing. Search reports an
         // actionable error if it cannot rebuild its derived index later.
         let _ = index::rebuild(&root);
@@ -18,7 +24,10 @@ pub fn get_library_state(app: AppHandle) -> CommandResult<LibraryState> {
 }
 
 #[tauri::command]
-pub async fn choose_library_root(app: AppHandle) -> CommandResult<LibraryState> {
+pub async fn choose_library_root(
+    app: AppHandle,
+    watcher: State<'_, LibraryWatcher>,
+) -> CommandResult<LibraryState> {
     let selected = app
         .dialog()
         .file()
@@ -26,7 +35,7 @@ pub async fn choose_library_root(app: AppHandle) -> CommandResult<LibraryState> 
         .blocking_pick_folder();
 
     let Some(selected) = selected else {
-        return get_library_state(app);
+        return get_library_state(app, watcher);
     };
 
     let path: PathBuf = selected
@@ -35,6 +44,7 @@ pub async fn choose_library_root(app: AppHandle) -> CommandResult<LibraryState> 
     let state = library::set_library_root(&app, path)?;
     if let Ok(root) = library::active_library_root(&app) {
         let _ = index::rebuild(&root);
+        let _ = watcher::watch_library(&app, &watcher, &root);
     }
     Ok(state)
 }

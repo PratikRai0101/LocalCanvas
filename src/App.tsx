@@ -362,6 +362,20 @@ function App() {
     return () => unlisten?.();
   }, [activeDrawing, library.root, selectedFolderPath]);
 
+  useEffect(() => {
+    if (!("__TAURI_INTERNALS__" in window)) {
+      return;
+    }
+
+    let unlisten: (() => void) | undefined;
+    void listen("library-changed", () => {
+      void refreshLibrary();
+    }).then((stopListening) => {
+      unlisten = stopListening;
+    });
+    return () => unlisten?.();
+  }, [refreshLibrary]);
+
   const activeFolderLabel = selectedFolderPath || "Library root";
 
   return (
