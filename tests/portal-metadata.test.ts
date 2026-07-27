@@ -1,6 +1,6 @@
 import { loadFromBlob, serializeAsJSON } from "@excalidraw/excalidraw";
 import { describe, expect, it } from "vitest";
-import { createPortalElements, ensureDrawingIdentity, findDrawingId, portalTargetPathForSelection } from "../src/canvas/portalMetadata";
+import { createPortalElements, ensureDrawingIdentity, findDrawingId, portalTargetForSelection } from "../src/canvas/portalMetadata";
 
 describe("drawing identity metadata", () => {
   it("creates one durable identity marker without adding scene-level metadata", async () => {
@@ -46,7 +46,10 @@ describe("drawing identity metadata", () => {
         targetPath: "Architecture/db-schema.excalidraw",
       },
     });
-    expect(portalTargetPathForSelection(restored.elements, { [rectangle!.id]: true }))
-      .toBe("Architecture/db-schema.excalidraw");
+    expect(portalTargetForSelection(restored.elements, { [rectangle!.id]: true }))
+      .toEqual({
+        targetId: "b2f1c9e0-1111-2222-3333-444444444444",
+        targetPath: "Architecture/db-schema.excalidraw",
+      });
   });
 });

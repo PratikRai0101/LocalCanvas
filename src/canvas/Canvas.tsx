@@ -10,7 +10,8 @@ import type {
 } from "@excalidraw/excalidraw/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DrawingSummary, libraryApi } from "../library/api";
-import { createPortalElements, ensureDrawingIdentity, portalTargetPathForSelection } from "./portalMetadata";
+import { createPortalElements, ensureDrawingIdentity, portalTargetForSelection } from "./portalMetadata";
+import type { PortalLink } from "./portalMetadata";
 
 type CanvasProps = {
   drawingPath: string;
@@ -18,7 +19,7 @@ type CanvasProps = {
   onSaveStatus: (status: SaveStatus) => void;
   onSaved: () => void;
   portalTargets: DrawingSummary[];
-  onOpenPortal: (path: string) => void;
+  onOpenPortal: (target: PortalLink) => void;
 };
 
 export type SaveStatus = "saved" | "saving" | "error";
@@ -65,12 +66,12 @@ export function Canvas({
       if (event.detail !== 2) {
         return;
       }
-      const targetPath = portalTargetPathForSelection(
+      const target = portalTargetForSelection(
         api.getSceneElementsIncludingDeleted(),
         api.getAppState().selectedElementIds,
       );
-      if (targetPath) {
-        onOpenPortalRef.current(targetPath);
+      if (target) {
+        onOpenPortalRef.current(target);
       }
     });
   }, []);

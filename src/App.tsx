@@ -2,6 +2,7 @@ import { listen } from "@tauri-apps/api/event";
 import { loadFromBlob, serializeAsJSON } from "@excalidraw/excalidraw";
 import { FormEvent, MouseEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Canvas, SaveStatus } from "./canvas/Canvas";
+import type { PortalLink } from "./canvas/portalMetadata";
 import {
   DrawingSummary,
   FolderSummary,
@@ -124,6 +125,21 @@ function App() {
       });
     return () => { cancelled = true; };
   }, [activeDrawing?.path, library.drawings, library.root]);
+
+  useEffect(() => {
+    if (!isGraphOpen || !library.root) {
+      return;
+    }
+
+    let cancelled = false;
+    void libraryApi.getGraph()
+      .then((nextGraph) => { if (!cancelled) setGraph(nextGraph); })
+      .catch((cause) => {
+        console.error("Failed to refresh graph", cause);
+        if (!cancelled) setError("Couldn’t refresh the drawing graph.");
+      });
+    return () => { cancelled = true; };
+  }, [isGraphOpen, library.drawings, library.root]);
 
   const visibleDrawings = useMemo(() => {
     const searchedDrawings = query.trim() ? searchResults ?? [] : library.drawings;
@@ -335,12 +351,31 @@ function App() {
     }
   }
 
-  function openPortal(path: string) {
+  function openDrawingPath(path: string) {
     const target = library.drawings.find((drawing) => drawing.path === path);
     if (target) {
       selectDrawing(target);
     } else {
-      setError("This portal’s target drawing is no longer in the library.");
+      setError("This drawing is no longer in the library.");
+    }
+  }
+
+  async function openPortal({ targetId, targetPath }: PortalLink) {
+    const pathTarget = library.drawings.find((drawing) => drawing.path === targetPath);
+    if (pathTarget) {
+      selectDrawing(pathTarget);
+      return;
+    }
+
+    try {
+      const resolvedTarget = await libraryApi.resolveDrawingId(targetId);
+      if (resolvedTarget) {
+        selectDrawing(resolvedTarget);
+      } else {
+        setError("This portal’s target drawing is no longer in the library.");
+      }
+    } catch (cause) {
+      setError(asMessage(cause, "Couldn’t resolve this portal’s target drawing."));
     }
   }
 
@@ -678,7 +713,7 @@ function App() {
         {!library.root ? (
           <Welcome onChoose={() => void chooseLibraryRoot()} isChoosing={isChoosingRoot} />
         ) : isGraphOpen && graph ? (
-          <GraphView graph={graph} onOpenDrawing={openPortal} onClose={() => setIsGraphOpen(false)} />
+          <GraphView graph={graph} onOpenDrawing={openDrawingPath} onClose={() => setIsGraphOpen(false)} />
         ) : activeDrawing ? (
           <>
             <Canvas

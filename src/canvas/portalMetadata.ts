@@ -23,6 +23,11 @@ export type PortalTarget = {
   title: string;
 };
 
+export type PortalLink = {
+  targetId: string;
+  targetPath: string;
+};
+
 export function ensureDrawingIdentity(elements: readonly ExcalidrawElement[]): DrawingIdentity {
   const existingDrawingId = findDrawingId(elements);
   if (existingDrawingId) {
@@ -73,22 +78,22 @@ export function createPortalElements(target: PortalTarget, x = 100, y = 100) {
   }], { regenerateIds: false });
 }
 
-export function portalTargetPathForSelection(
+export function portalTargetForSelection(
   elements: readonly ExcalidrawElement[],
   selectedElementIds: Record<string, boolean>,
-): string | null {
+): PortalLink | null {
   const selected = elements.filter((element) => selectedElementIds[element.id]);
   for (const element of selected) {
-    const targetPath = portalTargetPath(element);
-    if (targetPath) {
-      return targetPath;
+    const target = portalTarget(element);
+    if (target) {
+      return target;
     }
     const containerId = (element as { containerId?: string | null }).containerId;
     if (containerId) {
       const container = elements.find((candidate) => candidate.id === containerId);
-      const containerTargetPath = container && portalTargetPath(container);
-      if (containerTargetPath) {
-        return containerTargetPath;
+      const containerTarget = container && portalTarget(container);
+      if (containerTarget) {
+        return containerTarget;
       }
     }
   }
@@ -106,14 +111,16 @@ export function findDrawingId(elements: readonly ElementWithCustomData[]): strin
   return null;
 }
 
-function portalTargetPath(element: ElementWithCustomData): string | null {
+function portalTarget(element: ElementWithCustomData): PortalLink | null {
   const localcanvas = element.customData?.[LOCALCANVAS_KEY];
   if (!localcanvas || typeof localcanvas !== "object") {
     return null;
   }
-  const portal = localcanvas as { kind?: unknown; targetPath?: unknown };
-  return portal.kind === "portal" && typeof portal.targetPath === "string"
-    ? portal.targetPath
+  const portal = localcanvas as { kind?: unknown; targetId?: unknown; targetPath?: unknown };
+  return portal.kind === "portal"
+    && typeof portal.targetId === "string"
+    && typeof portal.targetPath === "string"
+    ? { targetId: portal.targetId, targetPath: portal.targetPath }
     : null;
 }
 
