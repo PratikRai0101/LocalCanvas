@@ -2,6 +2,7 @@ import { exportToSvg, loadFromBlob } from "@excalidraw/excalidraw";
 import { useEffect, useState } from "react";
 import type { SceneVersion } from "../library/api";
 import { libraryApi } from "../library/api";
+import { timelineVersionAt, timelineVersionIndex } from "./timeline";
 
 type HistoryPanelProps = {
   drawingPath: string;
@@ -20,6 +21,9 @@ export function HistoryPanel({ drawingPath, drawingTitle, versions, historyEnabl
   const [isRestoring, setIsRestoring] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const selectedVersion = versions.find((version) => version.id === selectedVersionId) ?? null;
+  const selectedTimelineIndex = selectedVersionId
+    ? timelineVersionIndex(versions, selectedVersionId) ?? 0
+    : 0;
 
   useEffect(() => {
     setSelectedVersionId(versions[0]?.id ?? null);
@@ -96,6 +100,27 @@ export function HistoryPanel({ drawingPath, drawingTitle, versions, historyEnabl
         </div>
       ) : (
         <>
+          {versions.length > 1 && (
+            <section className="history-timeline" aria-label="Version timeline">
+              <div>
+                <span>Oldest</span>
+                <strong>{formatVersionDate(selectedVersion!.createdAt)}</strong>
+                <span>Latest</span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max={versions.length - 1}
+                step="1"
+                value={selectedTimelineIndex}
+                aria-label="Browse saved versions"
+                onChange={(event) => {
+                  const version = timelineVersionAt(versions, Number(event.currentTarget.value));
+                  if (version) setSelectedVersionId(version.id);
+                }}
+              />
+            </section>
+          )}
           <div className="history-preview">
             {isLoadingPreview ? <span>Loading preview…</span> : previewUrl ? <img src={previewUrl} alt={`Preview of ${formatVersionDate(selectedVersion!.createdAt)}`} /> : <span>Preview unavailable</span>}
           </div>
