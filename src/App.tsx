@@ -325,6 +325,27 @@ function App() {
     }
   }
 
+  async function createQuickCapture() {
+    if (!library.root || isCreating) {
+      if (!library.root) setError("Choose a library folder before creating a quick canvas.");
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      const drawing = await libraryApi.createDrawing("", quickCaptureTitle());
+      await libraryApi.recordDrawingOpened(drawing.path);
+      const nextLibrary = await refreshLibrary();
+      setActiveDrawing(nextLibrary.drawings.find((item) => item.path === drawing.path) ?? drawing);
+      setSelectedFolderPath("");
+      setError(null);
+    } catch (cause) {
+      setError(asMessage(cause, "Couldn’t create a quick canvas."));
+    } finally {
+      setIsCreating(false);
+    }
+  }
+
   function selectDrawing(drawing: DrawingSummary) {
     setActiveDrawing(drawing);
     setIsHistoryOpen(false);
@@ -601,6 +622,8 @@ function App() {
         setIsCommandPaletteOpen(true);
       } else if (payload === "toggle-layers" && activeDrawing) {
         setIsLayersOpen((open) => !open);
+      } else if (payload === "quick-capture") {
+        void createQuickCapture();
       }
     }).then((stopListening) => {
       unlisten = stopListening;
@@ -1074,6 +1097,12 @@ function drawingPathsToSummaries(drawings: DrawingSummary[], paths: string[]) {
     const drawing = drawingsByPath.get(path);
     return drawing ? [drawing] : [];
   });
+}
+
+function quickCaptureTitle(now = new Date()) {
+  const date = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, "0"), String(now.getDate()).padStart(2, "0")].join("-");
+  const time = [String(now.getHours()).padStart(2, "0"), String(now.getMinutes()).padStart(2, "0")].join("");
+  return `Quick Capture ${date} ${time}`;
 }
 
 function parentPath(path: string) {

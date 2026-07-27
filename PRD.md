@@ -106,7 +106,7 @@ Primary: the author — a developer who uses whiteboarding constantly for archit
 | T3-2 | Optional git-backed auto-commit version history with browsable diff view |
 | T3-3 | Encrypted zip backup/export |
 | T3-4 | Custom Excalidraw shape libraries (`.excalidrawlib`) management UI |
-| T3-5 | Menu bar quick-capture icon for instant new sketch |
+| T3-5 ✅ | Menu bar quick-capture icon for instant new sketch |
 | T3-6 | Plugin/scripting hook system run on save |
 | T3-7 | iPad/Sidecar pressure-sensitive input support |
 | T3-8 | Content-addressed drawing history with optional on-chain hash anchoring for timestamp/IP-provenance proof |
