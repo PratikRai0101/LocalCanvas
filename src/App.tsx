@@ -631,8 +631,8 @@ function App() {
                 />
               ))}
               <div className="tag-filter" aria-label="Filter by Finder tag">
-                <button className={!selectedTag ? "is-selected" : ""} type="button" onClick={() => setSelectedTag(null)}>All tags</button>
-                {libraryTags.map((tag) => <button className={selectedTag === tag ? "is-selected" : ""} key={tag} type="button" onClick={() => setSelectedTag(tag)}>#{tag}</button>)}
+                <button className={!selectedTag ? "is-selected" : ""} type="button" onClick={showAllDrawings}>All tags</button>
+                {libraryTags.map((tag) => <button className={selectedTag === tag ? "is-selected" : ""} key={tag} type="button" onClick={() => browseTag(tag)}>#{tag}</button>)}
               </div>
               <div className="tree-drawings">
                 {visibleDrawings.map((drawing) => (

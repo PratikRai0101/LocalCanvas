@@ -61,7 +61,7 @@ export function CommandPalette({
       {
         id: "graph",
         group: "Actions",
-        label: isGraphOpen ? "Back to library" : "Open graph",
+        label: isGraphOpen ? "Close graph" : "Open graph",
         detail: "Graph",
         keywords: "connections links obsidian network",
         run: isGraphOpen ? onCloseGraph : onOpenGraph,
