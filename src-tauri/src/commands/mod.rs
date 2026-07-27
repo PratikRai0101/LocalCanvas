@@ -122,6 +122,32 @@ pub fn write_scene(app: AppHandle, relative_path: String, scene_json: String) ->
 }
 
 #[tauri::command]
+pub fn list_scene_versions(
+    app: AppHandle,
+    relative_path: String,
+) -> CommandResult<Vec<library::VersionSummary>> {
+    library::list_scene_versions(&app, &relative_path)
+}
+
+#[tauri::command]
+pub fn read_scene_version(
+    app: AppHandle,
+    relative_path: String,
+    version_id: String,
+) -> CommandResult<String> {
+    library::read_scene_version(&app, &relative_path, &version_id)
+}
+
+#[tauri::command]
+pub fn restore_scene_version(
+    app: AppHandle,
+    relative_path: String,
+    version_id: String,
+) -> CommandResult<()> {
+    library::restore_scene_version(&app, &relative_path, &version_id)
+}
+
+#[tauri::command]
 pub fn read_thumbnail(app: AppHandle, relative_path: String) -> CommandResult<Option<String>> {
     library::read_thumbnail(&app, &relative_path)
 }

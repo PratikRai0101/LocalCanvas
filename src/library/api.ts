@@ -32,6 +32,12 @@ export type DroppedImage = {
   contents: number[];
 };
 
+export type SceneVersion = {
+  id: string;
+  createdAt: number;
+  byteLength: number;
+};
+
 export type GraphData = {
   nodes: Array<{ id: string; path: string; title: string }>;
   edges: Array<{ sourceId: string; targetId: string }>;
@@ -55,6 +61,12 @@ export const libraryApi = {
     invoke<string>("read_scene", { relativePath }),
   writeScene: (relativePath: string, sceneJson: string) =>
     invoke<void>("write_scene", { relativePath, sceneJson }),
+  listSceneVersions: (relativePath: string) =>
+    invoke<SceneVersion[]>("list_scene_versions", { relativePath }),
+  readSceneVersion: (relativePath: string, versionId: string) =>
+    invoke<string>("read_scene_version", { relativePath, versionId }),
+  restoreSceneVersion: (relativePath: string, versionId: string) =>
+    invoke<void>("restore_scene_version", { relativePath, versionId }),
   readThumbnail: (relativePath: string) =>
     invoke<string | null>("read_thumbnail", { relativePath }),
   writeThumbnail: (relativePath: string, thumbnailSvg: string) =>

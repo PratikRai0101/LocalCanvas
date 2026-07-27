@@ -15,6 +15,8 @@ use walkdir::{DirEntry, WalkDir};
 const LOCALCANVAS_DIR: &str = ".localcanvas";
 const SETTINGS_FILE: &str = "settings.json";
 const THUMBNAIL_DIR: &str = "thumbnails";
+const VERSION_DIR: &str = "versions";
+const MAX_VERSION_SNAPSHOTS: usize = 50;
 const FINDER_TAG_ATTRIBUTE: &str = "com.apple.metadata:_kMDItemUserTags";
 
 pub type CommandResult<T> = Result<T, String>;
@@ -33,6 +35,14 @@ pub struct DrawingSummary {
 pub struct FolderSummary {
     pub path: String,
     pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VersionSummary {
+    pub id: String,
+    pub created_at: u128,
+    pub byte_length: u64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -143,11 +153,198 @@ pub fn read_scene(app: &AppHandle, relative_path: &str) -> CommandResult<String>
 
 pub fn write_scene(app: &AppHandle, relative_path: &str, scene_json: &str) -> CommandResult<()> {
     let root = active_library_root(app)?;
-    let path = resolve_existing_drawing_path(&root, relative_path)?;
+    write_scene_at(&root, relative_path, scene_json)
+}
+
+pub fn list_scene_versions(
+    app: &AppHandle,
+    relative_path: &str,
+) -> CommandResult<Vec<VersionSummary>> {
+    let root = active_library_root(app)?;
+    list_versions_at(&root, relative_path)
+}
+
+pub fn read_scene_version(
+    app: &AppHandle,
+    relative_path: &str,
+    version_id: &str,
+) -> CommandResult<String> {
+    let root = active_library_root(app)?;
+    read_version_at(&root, relative_path, version_id)
+}
+
+pub fn restore_scene_version(
+    app: &AppHandle,
+    relative_path: &str,
+    version_id: &str,
+) -> CommandResult<()> {
+    let root = active_library_root(app)?;
+    restore_version_at(&root, relative_path, version_id)
+}
+
+fn write_scene_at(root: &Path, relative_path: &str, scene_json: &str) -> CommandResult<()> {
+    let path = resolve_existing_drawing_path(root, relative_path)?;
     validate_excalidraw_scene(scene_json)?;
-    atomic_write(&path, scene_json.as_bytes())?;
-    invalidate_thumbnail(&root, relative_path);
+    let existing_scene =
+        fs::read(&path).map_err(|error| format!("Couldn't read drawing before saving: {error}"))?;
+    if existing_scene != scene_json.as_bytes() {
+        snapshot_scene(root, relative_path, &existing_scene)?;
+        atomic_write(&path, scene_json.as_bytes())?;
+        invalidate_thumbnail(root, relative_path);
+    }
     Ok(())
+}
+
+fn list_versions_at(root: &Path, relative_path: &str) -> CommandResult<Vec<VersionSummary>> {
+    let path = resolve_existing_drawing_path(root, relative_path)?;
+    let scene =
+        fs::read(&path).map_err(|error| format!("Couldn't read drawing versions: {error}"))?;
+    let mut versions = Vec::new();
+
+    for directory in version_directories(root, relative_path, &scene) {
+        let entries = match fs::read_dir(directory) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => return Err(format!("Couldn't read drawing versions: {error}")),
+        };
+        for entry in entries {
+            let entry = entry.map_err(|error| format!("Couldn't read drawing version: {error}"))?;
+            let path = entry.path();
+            let Some(id) = version_id_from_path(&path) else {
+                continue;
+            };
+            let metadata = entry
+                .metadata()
+                .map_err(|error| format!("Couldn't inspect drawing version: {error}"))?;
+            versions.push(VersionSummary {
+                created_at: version_timestamp(&id).unwrap_or_else(|| {
+                    metadata
+                        .modified()
+                        .unwrap_or(SystemTime::UNIX_EPOCH)
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_millis()
+                }),
+                id,
+                byte_length: metadata.len(),
+            });
+        }
+    }
+
+    versions.sort_by(|left, right| {
+        right
+            .created_at
+            .cmp(&left.created_at)
+            .then_with(|| right.id.cmp(&left.id))
+    });
+    versions.dedup_by(|left, right| left.id == right.id);
+    Ok(versions)
+}
+
+fn read_version_at(root: &Path, relative_path: &str, version_id: &str) -> CommandResult<String> {
+    let path = version_path(root, relative_path, version_id)?;
+    fs::read_to_string(path).map_err(|error| format!("Couldn't read drawing version: {error}"))
+}
+
+fn restore_version_at(root: &Path, relative_path: &str, version_id: &str) -> CommandResult<()> {
+    let scene_json = read_version_at(root, relative_path, version_id)?;
+    write_scene_at(root, relative_path, &scene_json)
+}
+
+fn snapshot_scene(root: &Path, relative_path: &str, scene: &[u8]) -> CommandResult<()> {
+    let directory = version_directories(root, relative_path, scene)
+        .into_iter()
+        .next()
+        .expect("a drawing always has a version directory");
+    let id = format!("{}-{}", now_millis(), Uuid::new_v4());
+    atomic_write(&directory.join(format!("{id}.excalidraw")), scene)?;
+    prune_versions(&directory)
+}
+
+fn version_path(root: &Path, relative_path: &str, version_id: &str) -> CommandResult<PathBuf> {
+    if !is_valid_version_id(version_id) {
+        return Err("Invalid drawing version identifier.".to_owned());
+    }
+    let drawing_path = resolve_existing_drawing_path(root, relative_path)?;
+    let scene = fs::read(&drawing_path)
+        .map_err(|error| format!("Couldn't read drawing versions: {error}"))?;
+    for directory in version_directories(root, relative_path, &scene) {
+        let candidate = directory.join(format!("{version_id}.excalidraw"));
+        if candidate.is_file() {
+            return Ok(candidate);
+        }
+    }
+    Err("The requested drawing version no longer exists.".to_owned())
+}
+
+fn version_directories(root: &Path, relative_path: &str, scene: &[u8]) -> Vec<PathBuf> {
+    let mut keys = vec![format!("path-{}", sha256_hex(relative_path.as_bytes()))];
+    if let Some(drawing_id) = drawing_id_from_scene(scene) {
+        keys.insert(0, format!("drawing-{drawing_id}"));
+    }
+    keys.into_iter()
+        .map(|key| root.join(LOCALCANVAS_DIR).join(VERSION_DIR).join(key))
+        .collect()
+}
+
+fn drawing_id_from_scene(scene: &[u8]) -> Option<Uuid> {
+    let scene = serde_json::from_slice::<Value>(scene).ok()?;
+    scene
+        .get("elements")?
+        .as_array()?
+        .iter()
+        .find_map(|element| {
+            let localcanvas = element.get("customData")?.get("localcanvas")?;
+            (localcanvas.get("kind")?.as_str() == Some("drawing-metadata"))
+                .then(|| localcanvas.get("drawingId")?.as_str())
+                .flatten()
+                .and_then(|id| Uuid::parse_str(id).ok())
+        })
+}
+
+fn prune_versions(directory: &Path) -> CommandResult<()> {
+    let mut versions = fs::read_dir(directory)
+        .map_err(|error| format!("Couldn't read drawing versions: {error}"))?
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let path = entry.path();
+            version_id_from_path(&path)
+                .map(|id| (path, version_timestamp(&id).unwrap_or_default(), id))
+        })
+        .collect::<Vec<_>>();
+    versions.sort_by(|left, right| right.1.cmp(&left.1).then_with(|| right.2.cmp(&left.2)));
+    for (path, _, _) in versions.into_iter().skip(MAX_VERSION_SNAPSHOTS) {
+        fs::remove_file(path)
+            .map_err(|error| format!("Couldn't prune drawing version: {error}"))?;
+    }
+    Ok(())
+}
+
+fn version_id_from_path(path: &Path) -> Option<String> {
+    let id = path.file_stem()?.to_str()?;
+    is_valid_version_id(id).then(|| id.to_owned())
+}
+
+fn is_valid_version_id(id: &str) -> bool {
+    let Some((timestamp, uuid)) = id.split_once('-') else {
+        return false;
+    };
+    !timestamp.is_empty()
+        && timestamp
+            .chars()
+            .all(|character| character.is_ascii_digit())
+        && Uuid::parse_str(uuid).is_ok()
+}
+
+fn version_timestamp(id: &str) -> Option<u128> {
+    id.split_once('-')?.0.parse().ok()
+}
+
+fn now_millis() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
 }
 
 pub fn read_thumbnail(app: &AppHandle, relative_path: &str) -> CommandResult<Option<String>> {
@@ -690,14 +887,16 @@ fn invalidate_thumbnail(root: &Path, relative_path: &str) {
 }
 
 fn thumbnail_path(root: &Path, relative_path: &str) -> PathBuf {
-    let hash = Sha256::digest(relative_path.as_bytes());
-    let file_name = hash
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
     root.join(LOCALCANVAS_DIR)
         .join(THUMBNAIL_DIR)
-        .join(format!("{file_name}.svg"))
+        .join(format!("{}.svg", sha256_hex(relative_path.as_bytes())))
+}
+
+fn sha256_hex(value: &[u8]) -> String {
+    Sha256::digest(value)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 fn atomic_write(path: &Path, contents: &[u8]) -> CommandResult<()> {
@@ -753,8 +952,9 @@ fn path_to_string(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        atomic_write, blank_scene, drawing_file_name, invalidate_thumbnail, safe_join,
-        thumbnail_path, validate_excalidraw_scene,
+        atomic_write, blank_scene, drawing_file_name, invalidate_thumbnail, list_versions_at,
+        read_version_at, restore_version_at, safe_join, thumbnail_path, validate_excalidraw_scene,
+        write_scene_at,
     };
     use std::{env, fs};
     use uuid::Uuid;
@@ -821,6 +1021,51 @@ mod tests {
 
         assert!(!thumbnail.exists());
         fs::remove_dir_all(root).expect("remove test directory");
+    }
+
+    #[test]
+    fn captures_and_restores_scene_versions_without_losing_the_current_scene() {
+        let root = env::temp_dir().join(format!("localcanvas-test-{}", Uuid::new_v4()));
+        let relative_path = "history.excalidraw";
+        fs::create_dir_all(&root).expect("create library root");
+        let root = root.canonicalize().expect("canonical library root");
+        let first = versioned_scene("first");
+        let second = versioned_scene("second");
+        fs::write(root.join(relative_path), &first).expect("write initial scene");
+
+        write_scene_at(&root, relative_path, &second).expect("save updated scene");
+        let versions = list_versions_at(&root, relative_path).expect("list saved versions");
+        assert_eq!(versions.len(), 1);
+        assert_eq!(
+            read_version_at(&root, relative_path, &versions[0].id).expect("read prior scene"),
+            first,
+        );
+
+        restore_version_at(&root, relative_path, &versions[0].id).expect("restore prior scene");
+        assert_eq!(fs::read_to_string(root.join(relative_path)).unwrap(), first);
+        let versions = list_versions_at(&root, relative_path).expect("list versions after restore");
+        assert_eq!(versions.len(), 2);
+        assert!(versions.iter().any(|version| {
+            read_version_at(&root, relative_path, &version.id).as_deref() == Ok(second.as_str())
+        }));
+        fs::remove_dir_all(root).expect("remove test directory");
+    }
+
+    fn versioned_scene(label: &str) -> String {
+        serde_json::json!({
+            "type": "excalidraw",
+            "elements": [{
+                "customData": {
+                    "localcanvas": {
+                        "kind": "drawing-metadata",
+                        "drawingId": "59d2eea8-dbd6-45a1-b8d9-9395ea418091"
+                    }
+                }
+            }, { "type": "text", "text": label }],
+            "appState": {},
+            "files": {}
+        })
+        .to_string()
     }
 
     #[test]

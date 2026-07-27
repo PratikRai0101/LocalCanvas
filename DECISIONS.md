@@ -62,3 +62,11 @@ Status: Accepted
 Context: Portals need a durable target identity that survives file moves and lets the rebuildable index resolve IDs to current paths. A SQLite-only ID or sidecar would violate the filesystem-source-of-truth invariant, while custom scene-level fields violate format compatibility requirements. Deleted elements are discarded by Excalidraw's restore path, so cannot carry this metadata.
 Decision: On first open, add a normal zero-opacity, locked Excalidraw rectangle whose `customData.localcanvas` payload has `kind: "drawing-metadata"` and a UUID. It is invisible in compatible Excalidraw consumers and survives their standard serialize/restore path.
 Consequences: Opening a legacy drawing performs one atomic migration write. The ID stays in the portable drawing file, so the SQLite index can always be rebuilt and links can survive renames and moves. The marker is an implementation detail and must never be exposed as a user-facing canvas element.
+
+## ADR-007: Keep version snapshots as bounded, non-authoritative local history
+
+Date: 2026-07-27
+Status: Accepted
+Context: Autosave needs recoverable history, but a history system must never replace the portable `.excalidraw` file as the source of truth or grow indefinitely.
+Decision: Before an autosave replaces changed scene contents, atomically copy the prior scene to `.localcanvas/versions/<drawing-id>/`. Keep the newest 50 snapshots per drawing. Restoring a snapshot uses the normal save path, so the current scene becomes a new snapshot first. A path-hash directory temporarily preserves snapshots for drawings created before durable metadata exists.
+Consequences: A restored drawing never destroys the current state, history remains local and bounded, and moves/renames preserve history once the drawing UUID metadata is present. Version snapshots are convenience recovery data, not a required input for opening the current drawing.
