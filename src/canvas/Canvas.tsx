@@ -51,6 +51,7 @@ export function Canvas({
   const unsubscribePortalPointer = useRef<(() => void) | null>(null);
   const saveTimer = useRef<number | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const [isPortalPickerOpen, setIsPortalPickerOpen] = useState(false);
   const [portalTargetPath, setPortalTargetPath] = useState("");
   const [isCreatingPortal, setIsCreatingPortal] = useState(false);
@@ -257,17 +258,6 @@ export function Canvas({
 
   return (
     <div className="canvas-host">
-      <div className="canvas-export-actions">
-        <button type="button" onClick={() => setIsPortalPickerOpen(true)} disabled={!portalTargets.length}>
-          Create portal
-        </button>
-        <button type="button" onClick={() => void exportScene("png")} disabled={isExporting}>
-          Export PNG
-        </button>
-        <button type="button" onClick={() => void exportScene("svg")} disabled={isExporting}>
-          Export SVG
-        </button>
-      </div>
       {isPortalPickerOpen && (
         <div className="portal-picker" role="dialog" aria-label="Create portal">
           <label>
@@ -291,6 +281,24 @@ export function Canvas({
         initialData={initialData}
         name={drawingTitle}
         onChange={scheduleAutosave}
+        renderTopRightUI={() => (
+          <div className="localcanvas-canvas-actions">
+            <button type="button" onClick={() => setIsPortalPickerOpen(true)} disabled={!portalTargets.length}>
+              Link canvas
+            </button>
+            <div className="localcanvas-export-menu">
+              <button type="button" onClick={() => setIsExportMenuOpen((isOpen) => !isOpen)} disabled={isExporting}>
+                Export
+              </button>
+              {isExportMenuOpen && (
+                <div role="menu">
+                  <button type="button" role="menuitem" onClick={() => { setIsExportMenuOpen(false); void exportScene("png"); }}>PNG</button>
+                  <button type="button" role="menuitem" onClick={() => { setIsExportMenuOpen(false); void exportScene("svg"); }}>SVG</button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         UIOptions={{
           canvasActions: {
             loadScene: false,
