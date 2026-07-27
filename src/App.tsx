@@ -644,7 +644,7 @@ function App() {
     };
 
     let unlisten: (() => void) | undefined;
-    void getCurrent().then(handleUrls);
+    void getCurrent().then((urls) => handleUrls(urls ?? []));
     void onOpenUrl(handleUrls).then((stopListening) => {
       unlisten = stopListening;
     });
