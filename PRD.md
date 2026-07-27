@@ -93,7 +93,7 @@ Primary: the author — a developer who uses whiteboarding constantly for archit
 | T2-6 | **Presentation mode**: sequential slideshow through a canvas's frames | Arrow keys advance/retreat; Escape exits to normal canvas view |
 | T2-7 ✅ | **Layers panel**: explicit list of z-ordered groups/elements with visibility toggles | Matches or exceeds Figma-style layer list ergonomics |
 | T2-8 | **Voice notes pinned to canvas locations** | Records via local mic, transcribes locally (faster-whisper), text is searchable |
-| T2-9 | **OCR-on-paste** for pasted screenshots/images | Extracted text becomes searchable metadata on the image element |
+| T2-9 ✅ | **OCR-on-paste** for pasted screenshots/images | Extracted text becomes searchable metadata on the image element |
 | T2-10 ✅ | **Version history timeline scrubber** | User can scrub back through autosaved snapshots and restore any prior version non-destructively |
 | T2-11 | **Command palette (Cmd+K)** | Fuzzy-jumps to any drawing, folder, or tag; runs common actions (new drawing, export, toggle graph view) |
 | T2-12 | **Git-friendly pretty-printed JSON option** | Optional setting that reformats saved JSON for meaningful line-level git diffs |

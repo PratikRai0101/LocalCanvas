@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { DrawingSummary, libraryApi } from "../library/api";
 import { clientPositionInCanvas, isSupportedImagePath } from "./nativeImageDrop";
 import { LayersPanel } from "./LayersPanel";
+import { attachOcrText } from "./ocrMetadata";
 import { layerEntries, layerSignature, moveLayer, setLayerLocked, setLayerVisibility } from "./layers";
 import { presentationFrames } from "./presentation";
 import { createPortalElements, ensureDrawingIdentity, portalTargetForSelection } from "./portalMetadata";
@@ -38,6 +39,7 @@ type CanvasProps = {
 export type SaveStatus = "saved" | "saving" | "error";
 
 type SceneChange = Parameters<NonNullable<ExcalidrawProps["onChange"]>>;
+type ClipboardData = Parameters<NonNullable<ExcalidrawProps["onPaste"]>>[0];
 type SceneSnapshot = {
   elements: SceneChange[0];
   appState: SceneChange[1];
@@ -224,6 +226,27 @@ export function Canvas({
     layerSignatureRef.current = layerSignature(next);
     api.updateScene({ elements: next });
     setLayerElements(next);
+  }, []);
+
+  const recognizePastedImages = useCallback((data: ClipboardData) => {
+    const files = Object.values(data.files ?? {}).filter((file) => file.mimeType.startsWith("image/"));
+    for (const file of files) {
+      void libraryApi.recognizeImageText(dataUrlBytes(file.dataURL))
+        .then((text) => {
+          const api = excalidrawApi.current;
+          if (!api || !text.trim()) return;
+          api.updateScene({
+            elements: attachOcrText(
+              api.getSceneElementsIncludingDeleted(),
+              new Set([file.id]),
+              text,
+            ),
+          });
+        })
+        .catch((error) => console.warn("OCR could not analyze pasted image", error));
+    }
+    // Returning false leaves Excalidraw's native paste behavior unchanged.
+    return false;
   }, []);
 
   const startPresentation = useCallback(() => {
@@ -533,6 +556,7 @@ export function Canvas({
         initialData={initialData}
         name={drawingTitle}
         onChange={scheduleAutosave}
+        onPaste={recognizePastedImages}
         renderTopRightUI={() => isPresenting ? null : (
           <div className="localcanvas-canvas-actions">
             <button type="button" onClick={startPresentation} title={frameCount ? "Present frames" : "Add a frame to create presentation slides"}>
@@ -571,6 +595,12 @@ async function imageDimensions(file: File) {
   } finally {
     URL.revokeObjectURL(objectUrl);
   }
+}
+
+function dataUrlBytes(dataUrl: string) {
+  const encoded = dataUrl.slice(dataUrl.indexOf(",") + 1);
+  const binary = atob(encoded);
+  return Array.from(binary, (character) => character.charCodeAt(0));
 }
 
 function dataTransferContainsImage(dataTransfer: DataTransfer) {

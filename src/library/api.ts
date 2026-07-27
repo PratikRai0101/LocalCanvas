@@ -75,6 +75,8 @@ export const libraryApi = {
   writeThumbnail: (relativePath: string, thumbnailSvg: string) =>
     invoke<void>("write_thumbnail", { relativePath, thumbnailSvg }),
   readDroppedImage: (path: string) => invoke<DroppedImage>("read_dropped_image", { path }),
+  recognizeImageText: (imageBytes: number[]) =>
+    invoke<string>("recognize_image_text", { imageBytes }),
   pickImportScene: () => invoke<ImportedScene>("pick_import_scene"),
   createDrawing: (parentPath: string, title: string) =>
     invoke<DrawingSummary>("create_drawing", { parentPath, title }),
