@@ -1,5 +1,7 @@
 import {
+  convertToExcalidrawElements,
   Excalidraw,
+  getDataURL,
   loadFromBlob,
   serializeAsJSON,
 } from "@excalidraw/excalidraw";
@@ -50,6 +52,8 @@ export function Canvas({
   const unsubscribePortalPointer = useRef<(() => void) | null>(null);
   const saveTimer = useRef<number | null>(null);
   const [isPortalPickerOpen, setIsPortalPickerOpen] = useState(false);
+  const [isAddingImage, setIsAddingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
   const [portalTargetPath, setPortalTargetPath] = useState("");
   const [isCreatingPortal, setIsCreatingPortal] = useState(false);
 
@@ -152,6 +156,44 @@ export function Canvas({
     [saveLatestScene],
   );
 
+  const addImage = useCallback(async () => {
+    const api = excalidrawApi.current;
+    if (!api) {
+      return;
+    }
+
+    setIsAddingImage(true);
+    setImageError(null);
+    try {
+      const imported = await libraryApi.pickImage();
+      const file = new File([new Uint8Array(imported.contents)], imported.fileName, { type: imported.mimeType });
+      const fileId = crypto.randomUUID();
+      api.addFiles([{
+        id: fileId as never,
+        mimeType: imported.mimeType as never,
+        dataURL: await getDataURL(file),
+        created: Date.now(),
+      }]);
+      const imageElements = convertToExcalidrawElements([{
+        type: "image",
+        x: 100,
+        y: 100,
+        width: 320,
+        height: 240,
+        fileId: fileId as never,
+      }]);
+      api.updateScene({ elements: [...api.getSceneElementsIncludingDeleted(), ...imageElements] });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Couldn’t add the selected image.";
+      if (message !== "No image was selected.") {
+        console.error("Failed to add image", error);
+        setImageError(message);
+      }
+    } finally {
+      setIsAddingImage(false);
+    }
+  }, []);
+
   const createPortal = useCallback(async () => {
     const api = excalidrawApi.current;
     const target = portalTargets.find((drawing) => drawing.path === portalTargetPath);
@@ -227,6 +269,7 @@ export function Canvas({
 
   return (
     <div className="canvas-host">
+      {imageError && <div className="canvas-image-error" role="alert">{imageError}</div>}
       {isPortalPickerOpen && (
         <div className="portal-picker" role="dialog" aria-label="Create portal">
           <label>
@@ -252,6 +295,9 @@ export function Canvas({
         onChange={scheduleAutosave}
         renderTopRightUI={() => (
           <div className="localcanvas-canvas-actions">
+            <button type="button" onClick={() => void addImage()} disabled={isAddingImage}>
+              {isAddingImage ? "Adding image…" : "Add image"}
+            </button>
             <button type="button" onClick={() => setIsPortalPickerOpen(true)} disabled={!portalTargets.length}>
               Link canvas
             </button>
@@ -261,6 +307,9 @@ export function Canvas({
           canvasActions: {
             loadScene: false,
             saveToActiveFile: false,
+          },
+          tools: {
+            image: false,
           },
         }}
       />
