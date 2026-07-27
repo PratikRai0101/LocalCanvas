@@ -166,7 +166,7 @@ kbd, .search-shortcut { padding: 1px 4px; color: #9e9ba1; background: #fff; bord
 .localcanvas-canvas-actions button:disabled { cursor: not-allowed; opacity: .6; }
 .presentation-message { align-self: center; max-width: 180px; padding: 5px 7px; color: #5d5964; background: rgba(255, 255, 255, .94); border: 1px solid #dedce0; border-radius: 5px; font-size: 10px; }
 .portal-picker { position: absolute; z-index: 3; top: 50px; right: 14px; width: 240px; padding: 12px; color: #4e4b54; background: #fff; border: 1px solid #dedce0; border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .14); font-size: 11px; }
-.layers-panel { position: absolute; z-index: 4; top: 14px; right: 14px; bottom: 14px; display: flex; width: 278px; flex-direction: column; color: #4e4b54; background: rgba(255, 255, 255, .98); border: 1px solid #dedce0; border-radius: 9px; box-shadow: 0 10px 32px rgba(0, 0, 0, .16); }
+.layers-panel { position: absolute; z-index: 4; top: 73px; right: 14px; bottom: 14px; display: flex; width: 278px; flex-direction: column; color: #4e4b54; background: rgba(255, 255, 255, .98); border: 1px solid #dedce0; border-radius: 9px; box-shadow: 0 10px 32px rgba(0, 0, 0, .16); }
 .layers-panel header { display: flex; align-items: flex-start; justify-content: space-between; padding: 13px 13px 10px; border-bottom: 1px solid #ece9ed; }
 .layers-panel header p { margin: 0 0 3px; color: #908c96; font-size: 9px; font-weight: 700; letter-spacing: .1em; }
 .layers-panel header h2 { margin: 0; color: #39363e; font-size: 14px; }
