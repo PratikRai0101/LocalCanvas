@@ -13,6 +13,8 @@ pub fn run() {
             commands::search_drawings,
             commands::read_scene,
             commands::write_scene,
+            commands::read_thumbnail,
+            commands::write_thumbnail,
             commands::create_drawing,
             commands::create_folder,
         ])

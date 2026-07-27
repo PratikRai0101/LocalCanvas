@@ -60,6 +60,20 @@ pub fn write_scene(app: AppHandle, relative_path: String, scene_json: String) ->
 }
 
 #[tauri::command]
+pub fn read_thumbnail(app: AppHandle, relative_path: String) -> CommandResult<Option<String>> {
+    library::read_thumbnail(&app, &relative_path)
+}
+
+#[tauri::command]
+pub fn write_thumbnail(
+    app: AppHandle,
+    relative_path: String,
+    thumbnail_svg: String,
+) -> CommandResult<()> {
+    library::write_thumbnail(&app, &relative_path, &thumbnail_svg)
+}
+
+#[tauri::command]
 pub fn create_drawing(
     app: AppHandle,
     parent_path: String,

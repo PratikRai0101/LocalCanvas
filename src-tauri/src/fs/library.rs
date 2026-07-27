@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::{
     fs::{self, OpenOptions},
     io::Write,
@@ -12,6 +13,7 @@ use walkdir::{DirEntry, WalkDir};
 
 const LOCALCANVAS_DIR: &str = ".localcanvas";
 const SETTINGS_FILE: &str = "settings.json";
+const THUMBNAIL_DIR: &str = "thumbnails";
 
 pub type CommandResult<T> = Result<T, String>;
 
@@ -94,7 +96,49 @@ pub fn write_scene(app: &AppHandle, relative_path: &str, scene_json: &str) -> Co
     let root = active_library_root(app)?;
     let path = resolve_existing_drawing_path(&root, relative_path)?;
     validate_excalidraw_scene(scene_json)?;
-    atomic_write(&path, scene_json.as_bytes())
+    atomic_write(&path, scene_json.as_bytes())?;
+    invalidate_thumbnail(&root, relative_path);
+    Ok(())
+}
+
+pub fn read_thumbnail(app: &AppHandle, relative_path: &str) -> CommandResult<Option<String>> {
+    let root = active_library_root(app)?;
+    let drawing_path = resolve_existing_drawing_path(&root, relative_path)?;
+    let thumbnail_path = thumbnail_path(&root, relative_path);
+
+    if !thumbnail_path.exists() {
+        return Ok(None);
+    }
+
+    let drawing_modified = fs::metadata(&drawing_path)
+        .and_then(|metadata| metadata.modified())
+        .unwrap_or(SystemTime::UNIX_EPOCH);
+    let thumbnail_modified = fs::metadata(&thumbnail_path)
+        .and_then(|metadata| metadata.modified())
+        .unwrap_or(SystemTime::UNIX_EPOCH);
+
+    if thumbnail_modified < drawing_modified {
+        let _ = fs::remove_file(&thumbnail_path);
+        return Ok(None);
+    }
+
+    fs::read_to_string(&thumbnail_path)
+        .map(Some)
+        .map_err(|error| format!("Couldn't read drawing thumbnail: {error}"))
+}
+
+pub fn write_thumbnail(
+    app: &AppHandle,
+    relative_path: &str,
+    thumbnail_svg: &str,
+) -> CommandResult<()> {
+    if !thumbnail_svg.trim_start().starts_with("<svg") {
+        return Err("A thumbnail must be an SVG generated from an Excalidraw scene.".to_owned());
+    }
+
+    let root = active_library_root(app)?;
+    resolve_existing_drawing_path(&root, relative_path)?;
+    atomic_write(&thumbnail_path(&root, relative_path), thumbnail_svg.as_bytes())
 }
 
 pub fn create_drawing(
@@ -373,6 +417,21 @@ fn validate_excalidraw_scene(scene_json: &str) -> CommandResult<()> {
     Ok(())
 }
 
+fn invalidate_thumbnail(root: &Path, relative_path: &str) {
+    let _ = fs::remove_file(thumbnail_path(root, relative_path));
+}
+
+fn thumbnail_path(root: &Path, relative_path: &str) -> PathBuf {
+    let hash = Sha256::digest(relative_path.as_bytes());
+    let file_name = hash
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    root.join(LOCALCANVAS_DIR)
+        .join(THUMBNAIL_DIR)
+        .join(format!("{file_name}.svg"))
+}
+
 fn atomic_write(path: &Path, contents: &[u8]) -> CommandResult<()> {
     let parent = path
         .parent()
@@ -426,7 +485,8 @@ fn path_to_string(path: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        atomic_write, blank_scene, drawing_file_name, safe_join, validate_excalidraw_scene,
+        atomic_write, blank_scene, drawing_file_name, invalidate_thumbnail, safe_join,
+        thumbnail_path, validate_excalidraw_scene,
     };
     use std::{env, fs};
     use uuid::Uuid;
@@ -465,6 +525,31 @@ mod tests {
             1
         );
         fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[test]
+    fn keeps_thumbnail_cache_paths_inside_localcanvas() {
+        let root = env::temp_dir();
+        let first = thumbnail_path(&root, "Architecture/auth-flow.excalidraw");
+        let second = thumbnail_path(&root, "Architecture/db-schema.excalidraw");
+
+        assert_ne!(first, second);
+        assert_eq!(first.parent().unwrap(), root.join(".localcanvas/thumbnails"));
+        assert_eq!(first.extension().unwrap(), "svg");
+    }
+
+    #[test]
+    fn invalidates_the_cached_thumbnail_after_a_scene_save() {
+        let root = env::temp_dir().join(format!("localcanvas-test-{}", Uuid::new_v4()));
+        let drawing_path = "Architecture/auth-flow.excalidraw";
+        let thumbnail = thumbnail_path(&root, drawing_path);
+        fs::create_dir_all(thumbnail.parent().unwrap()).expect("create thumbnail cache");
+        fs::write(&thumbnail, "<svg />").expect("write thumbnail");
+
+        invalidate_thumbnail(&root, drawing_path);
+
+        assert!(!thumbnail.exists());
+        fs::remove_dir_all(root).expect("remove test directory");
     }
 
     #[test]
