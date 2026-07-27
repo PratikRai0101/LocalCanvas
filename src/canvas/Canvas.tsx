@@ -25,7 +25,7 @@ type CanvasProps = {
   drawingTitle: string;
   onSaveStatus: (status: SaveStatus) => void;
   onSaved: () => void;
-  onAutosaveController?: (controller: { flush: () => Promise<void> } | null) => void;
+  onAutosaveController?: (controller: { flush: () => Promise<void>; suspend: () => void } | null) => void;
   portalTargets: DrawingSummary[];
   onOpenPortal: (target: PortalLink) => void;
 };
@@ -62,11 +62,13 @@ export function Canvas({
   const onOpenPortalRef = useRef(onOpenPortal);
   const unsubscribePortalPointer = useRef<(() => void) | null>(null);
   const saveTimer = useRef<number | null>(null);
+  const autosaveSuspended = useRef(false);
   const [isPortalPickerOpen, setIsPortalPickerOpen] = useState(false);
   const [frameCount, setFrameCount] = useState(0);
   const [presentationSlides, setPresentationSlides] = useState<PresentationFrame[]>([]);
   const [presentationSlideIndex, setPresentationSlideIndex] = useState(0);
   const [isPresenting, setIsPresenting] = useState(false);
+  const [presentationMessage, setPresentationMessage] = useState<string | null>(null);
   const [usesNativeFileDrops, setUsesNativeFileDrops] = useState(false);
   const [portalTargetPath, setPortalTargetPath] = useState("");
   const [isCreatingPortal, setIsCreatingPortal] = useState(false);
@@ -168,10 +170,18 @@ export function Canvas({
     await saveLatestScene();
   }, [saveLatestScene]);
 
+  const suspendAutosave = useCallback(() => {
+    autosaveSuspended.current = true;
+    if (saveTimer.current !== null) {
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+  }, []);
+
   useEffect(() => {
-    onAutosaveController?.({ flush: flushAutosave });
+    onAutosaveController?.({ flush: flushAutosave, suspend: suspendAutosave });
     return () => onAutosaveController?.(null);
-  }, [flushAutosave, onAutosaveController]);
+  }, [flushAutosave, onAutosaveController, suspendAutosave]);
 
   useEffect(
     () => () => {
@@ -189,8 +199,10 @@ export function Canvas({
     }
     const slides = presentationFrames(api.getSceneElementsIncludingDeleted()) as PresentationFrame[];
     if (!slides.length) {
+      setPresentationMessage("Add a frame to create presentation slides.");
       return;
     }
+    setPresentationMessage(null);
     presentationActive.current = true;
     setPresentationSlides(slides);
     setPresentationSlideIndex(0);
@@ -381,6 +393,9 @@ export function Canvas({
 
   const scheduleAutosave = useCallback(
     (...change: SceneChange) => {
+      if (autosaveSuspended.current) {
+        return;
+      }
       latestScene.current = {
         elements: change[0],
         appState: change[1],
@@ -469,9 +484,10 @@ export function Canvas({
         onChange={scheduleAutosave}
         renderTopRightUI={() => isPresenting ? null : (
           <div className="localcanvas-canvas-actions">
-            <button type="button" onClick={startPresentation} disabled={!frameCount}>
+            <button type="button" onClick={startPresentation} title={frameCount ? "Present frames" : "Add a frame to create presentation slides"}>
               Present
             </button>
+            {presentationMessage && <span className="presentation-message" role="status">{presentationMessage}</span>}
             <button type="button" onClick={() => setIsPortalPickerOpen(true)} disabled={!portalTargets.length}>
               Link canvas
             </button>

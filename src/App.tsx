@@ -54,7 +54,7 @@ function App() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [versions, setVersions] = useState<SceneVersion[]>([]);
   const [canvasRevision, setCanvasRevision] = useState(0);
-  const flushCanvasSave = useRef<(() => Promise<void>) | null>(null);
+  const canvasAutosave = useRef<{ flush: () => Promise<void>; suspend: () => void } | null>(null);
   const handleSaveStatus = useCallback((status: SaveStatus) => {
     if (status === "error") {
       setError("Couldn’t save this drawing. Your latest changes may not be on disk.");
@@ -357,7 +357,7 @@ function App() {
 
     setIsLoadingHistory(true);
     try {
-      await flushCanvasSave.current?.();
+      await canvasAutosave.current?.flush();
       setVersions(await libraryApi.listSceneVersions(activeDrawing.path));
       setIsHistoryOpen(true);
       setError(null);
@@ -386,7 +386,11 @@ function App() {
       return;
     }
 
-    await flushCanvasSave.current?.();
+    await canvasAutosave.current?.flush();
+    // A restore replaces the whole scene. Suppress the old Canvas instance's
+    // pending onChange callback so it cannot overwrite the restored file while
+    // React is remounting the canvas.
+    canvasAutosave.current?.suspend();
     await libraryApi.restoreSceneVersion(activeDrawing.path, version.id);
     await refreshLibrary();
     setCanvasRevision((revision) => revision + 1);
@@ -803,7 +807,7 @@ function App() {
               drawingTitle={activeDrawing.title}
               onSaveStatus={handleSaveStatus}
               onSaved={handleCanvasSaved}
-              onAutosaveController={(controller) => { flushCanvasSave.current = controller?.flush ?? null; }}
+              onAutosaveController={(controller) => { canvasAutosave.current = controller; }}
               portalTargets={library.drawings.filter((drawing) => drawing.path !== activeDrawing.path)}
               onOpenPortal={openPortal}
             />

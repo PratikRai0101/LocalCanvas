@@ -163,7 +163,8 @@ kbd, .search-shortcut { padding: 1px 4px; color: #9e9ba1; background: #fff; bord
 .localcanvas-canvas-actions { display: flex; gap: 5px; }
 .localcanvas-canvas-actions button { padding: 6px 9px; color: #4e4b54; background: rgba(255, 255, 255, .94); border: 1px solid #dedce0; border-radius: 6px; box-shadow: 0 1px 3px rgba(0, 0, 0, .08); cursor: pointer; font: 600 11px Inter, sans-serif; }
 .localcanvas-canvas-actions button:hover:not(:disabled) { border-color: #aaa6df; color: #5f5ab9; }
-.localcanvas-canvas-actions button:disabled { cursor: wait; opacity: .6; }
+.localcanvas-canvas-actions button:disabled { cursor: not-allowed; opacity: .6; }
+.presentation-message { align-self: center; max-width: 180px; padding: 5px 7px; color: #5d5964; background: rgba(255, 255, 255, .94); border: 1px solid #dedce0; border-radius: 5px; font-size: 10px; }
 .portal-picker { position: absolute; z-index: 3; top: 50px; right: 14px; width: 240px; padding: 12px; color: #4e4b54; background: #fff; border: 1px solid #dedce0; border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .14); font-size: 11px; }
 .portal-picker label { display: grid; gap: 6px; font-weight: 600; }
 .portal-picker select { width: 100%; padding: 6px; color: inherit; border: 1px solid #dedce0; border-radius: 4px; background: #fff; font: inherit; }
