@@ -92,6 +92,7 @@ pub fn run() {
             commands::choose_library_root,
             commands::rebuild_index,
             commands::search_drawings,
+            commands::resolve_drawing_id,
             commands::get_graph,
             commands::get_backlinks,
             commands::record_drawing_opened,

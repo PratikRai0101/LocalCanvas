@@ -69,6 +69,14 @@ pub fn search_drawings(app: AppHandle, query: String) -> CommandResult<Vec<Drawi
 }
 
 #[tauri::command]
+pub fn resolve_drawing_id(
+    app: AppHandle,
+    drawing_id: String,
+) -> CommandResult<Option<DrawingSummary>> {
+    index::resolve_drawing_id(&library::active_library_root(&app)?, &drawing_id)
+}
+
+#[tauri::command]
 pub fn get_graph(app: AppHandle) -> CommandResult<GraphData> {
     index::graph(&library::active_library_root(&app)?)
 }

@@ -39,6 +39,8 @@ export const libraryApi = {
   getBacklinks: (relativePath: string) =>
     invoke<DrawingSummary[]>("get_backlinks", { relativePath }),
   getGraph: () => invoke<GraphData>("get_graph"),
+  resolveDrawingId: (drawingId: string) =>
+    invoke<DrawingSummary | null>("resolve_drawing_id", { drawingId }),
   recordDrawingOpened: (relativePath: string) =>
     invoke<void>("record_drawing_opened", { relativePath }),
   setDrawingPinned: (relativePath: string, pinned: boolean) =>

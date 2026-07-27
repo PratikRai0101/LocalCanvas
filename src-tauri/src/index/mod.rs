@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -100,6 +100,31 @@ pub fn rebuild(root: &Path) -> CommandResult<IndexStats> {
         drawing_count,
         indexed_text_elements,
     })
+}
+
+pub fn resolve_drawing_id(root: &Path, drawing_id: &str) -> CommandResult<Option<DrawingSummary>> {
+    let database_path = root.join(CACHE_DIRECTORY).join(DATABASE_FILE);
+    if !database_path.exists() {
+        rebuild(root)?;
+    }
+    let connection = Connection::open(&database_path)
+        .map_err(|error| format!("Couldn't open search index: {error}"))?;
+    connection
+        .query_row(
+            "SELECT path, title, updated_at FROM drawings WHERE id = ?1",
+            params![drawing_id],
+            |row| {
+                let modified_at: String = row.get(2)?;
+                Ok(DrawingSummary {
+                    path: row.get(0)?,
+                    title: row.get(1)?,
+                    modified_at: modified_at.parse().unwrap_or_default(),
+                    tags: Vec::new(),
+                })
+            },
+        )
+        .optional()
+        .map_err(|error| format!("Couldn't resolve portal target: {error}"))
 }
 
 pub fn graph(root: &Path) -> CommandResult<GraphData> {
@@ -405,7 +430,7 @@ fn content_hash(contents: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{backlinks, graph, rebuild, search};
+    use super::{backlinks, graph, rebuild, resolve_drawing_id, search};
     use std::{env, fs};
     use uuid::Uuid;
 
@@ -464,6 +489,22 @@ mod tests {
         assert_eq!(graph.edges.len(), 1);
         assert_eq!(graph.edges[0].source_id, "source-id");
         assert_eq!(graph.edges[0].target_id, "target-id");
+        assert_eq!(
+            resolve_drawing_id(&root, "target-id").unwrap().unwrap().path,
+            "target.excalidraw",
+        );
+
+        fs::create_dir(root.join("Moved")).expect("create moved folder");
+        fs::rename(
+            root.join("target.excalidraw"),
+            root.join("Moved/renamed.excalidraw"),
+        )
+        .expect("move target drawing");
+        rebuild(&root).expect("rebuild after move");
+        assert_eq!(
+            resolve_drawing_id(&root, "target-id").unwrap().unwrap().path,
+            "Moved/renamed.excalidraw",
+        );
 
         fs::remove_dir_all(root).expect("remove test library");
     }
