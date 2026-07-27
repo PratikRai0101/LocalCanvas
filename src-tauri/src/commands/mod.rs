@@ -103,61 +103,6 @@ pub fn write_scene(app: AppHandle, relative_path: String, scene_json: String) ->
 }
 
 #[tauri::command]
-pub async fn export_file(
-    app: AppHandle,
-    suggested_name: String,
-    extension: String,
-    contents: Vec<u8>,
-) -> CommandResult<()> {
-    let extension = sanitize_extension(&extension)?.to_owned();
-    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
-    let format_name = extension.to_ascii_uppercase();
-    app.dialog()
-        .file()
-        .set_title(format!("Export {format_name} drawing"))
-        .set_file_name(format!("{}.{}", file_stem(&suggested_name), extension))
-        .add_filter(format!("{format_name} image"), &[extension.as_str()])
-        .save_file(move |selected| {
-            let _ = sender.send(selected);
-        });
-
-    let selected = tauri::async_runtime::spawn_blocking(move || receiver.recv())
-        .await
-        .map_err(|error| format!("Export dialog task failed: {error}"))?
-        .map_err(|error| format!("Export dialog closed unexpectedly: {error}"))?;
-    let Some(selected) = selected else {
-        return Ok(());
-    };
-    let path = selected
-        .into_path()
-        .map_err(|error| format!("Couldn't use the export location: {error}"))?;
-    let path = path_with_extension(path, &extension);
-    tauri::async_runtime::spawn_blocking(move || fs::write(path, contents))
-        .await
-        .map_err(|error| format!("Export write task failed: {error}"))?
-        .map_err(|error| format!("Couldn't export drawing: {error}"))
-}
-
-fn sanitize_extension(extension: &str) -> CommandResult<&str> {
-    match extension {
-        "png" | "svg" => Ok(extension),
-        _ => Err("Unsupported export format.".to_owned()),
-    }
-}
-
-fn file_stem(name: &str) -> &str {
-    let stem = name.trim_end_matches(".excalidraw").trim();
-    if stem.is_empty() { "drawing" } else { stem }
-}
-
-fn path_with_extension(mut path: PathBuf, extension: &str) -> PathBuf {
-    if path.extension().is_none() {
-        path.set_extension(extension);
-    }
-    path
-}
-
-#[tauri::command]
 pub fn read_thumbnail(app: AppHandle, relative_path: String) -> CommandResult<Option<String>> {
     library::read_thumbnail(&app, &relative_path)
 }

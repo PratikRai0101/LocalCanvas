@@ -47,8 +47,6 @@ export const libraryApi = {
     invoke<string>("read_scene", { relativePath }),
   writeScene: (relativePath: string, sceneJson: string) =>
     invoke<void>("write_scene", { relativePath, sceneJson }),
-  exportFile: (suggestedName: string, extension: "png" | "svg", contents: Uint8Array) =>
-    invoke<void>("export_file", { suggestedName, extension, contents: [...contents] }),
   readThumbnail: (relativePath: string) =>
     invoke<string | null>("read_thumbnail", { relativePath }),
   writeThumbnail: (relativePath: string, thumbnailSvg: string) =>

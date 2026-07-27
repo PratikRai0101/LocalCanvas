@@ -98,7 +98,6 @@ pub fn run() {
             commands::set_drawing_pinned,
             commands::read_scene,
             commands::write_scene,
-            commands::export_file,
             commands::read_thumbnail,
             commands::write_thumbnail,
             commands::pick_import_scene,
