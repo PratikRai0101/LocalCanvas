@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::{
+    collections::HashMap,
     fs::{self, OpenOptions},
     io::Write,
     path::{Component, Path, PathBuf},
@@ -40,25 +41,41 @@ pub struct LibraryState {
     pub root: Option<String>,
     pub drawings: Vec<DrawingSummary>,
     pub folders: Vec<FolderSummary>,
+    pub recent_paths: Vec<String>,
+    pub pinned_paths: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Default)]
+struct LibraryPreferences {
+    #[serde(default)]
+    recent_paths: Vec<String>,
+    #[serde(default)]
+    pinned_paths: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Default)]
 struct Settings {
     library_root: Option<PathBuf>,
+    #[serde(default)]
+    preferences: HashMap<String, LibraryPreferences>,
 }
 
 pub fn get_library_state(app: &AppHandle) -> CommandResult<LibraryState> {
     match load_library_root(app)? {
-        Some(root) if root.is_dir() => list_library(root),
+        Some(root) if root.is_dir() => with_preferences(app, list_library(root)?),
         Some(root) => Ok(LibraryState {
             root: Some(path_to_string(&root)),
             drawings: Vec::new(),
             folders: Vec::new(),
+            recent_paths: Vec::new(),
+            pinned_paths: Vec::new(),
         }),
         None => Ok(LibraryState {
             root: None,
             drawings: Vec::new(),
             folders: Vec::new(),
+            recent_paths: Vec::new(),
+            pinned_paths: Vec::new(),
         }),
     }
 }
@@ -77,14 +94,34 @@ pub fn set_library_root(app: &AppHandle, root: PathBuf) -> CommandResult<Library
     fs::create_dir_all(root.join(LOCALCANVAS_DIR))
         .map_err(|error| format!("Couldn't prepare LocalCanvas cache: {error}"))?;
 
-    save_settings(
-        app,
-        &Settings {
-            library_root: Some(root.clone()),
-        },
-    )?;
+    let mut settings = load_settings(app)?;
+    settings.library_root = Some(root.clone());
+    save_settings(app, &settings)?;
 
-    list_library(root)
+    with_preferences(app, list_library(root)?)
+}
+
+pub fn record_drawing_opened(app: &AppHandle, relative_path: &str) -> CommandResult<()> {
+    let root = active_library_root(app)?;
+    resolve_existing_drawing_path(&root, relative_path)?;
+    let mut settings = load_settings(app)?;
+    let preferences = settings.preferences.entry(path_to_string(&root)).or_default();
+    preferences.recent_paths.retain(|path| path != relative_path);
+    preferences.recent_paths.insert(0, relative_path.to_owned());
+    preferences.recent_paths.truncate(10);
+    save_settings(app, &settings)
+}
+
+pub fn set_drawing_pinned(app: &AppHandle, relative_path: &str, pinned: bool) -> CommandResult<()> {
+    let root = active_library_root(app)?;
+    resolve_existing_drawing_path(&root, relative_path)?;
+    let mut settings = load_settings(app)?;
+    let preferences = settings.preferences.entry(path_to_string(&root)).or_default();
+    preferences.pinned_paths.retain(|path| path != relative_path);
+    if pinned {
+        preferences.pinned_paths.push(relative_path.to_owned());
+    }
+    save_settings(app, &settings)
 }
 
 pub fn read_scene(app: &AppHandle, relative_path: &str) -> CommandResult<String> {
@@ -358,6 +395,8 @@ fn list_library(root: PathBuf) -> CommandResult<LibraryState> {
         root: Some(path_to_string(&root)),
         drawings,
         folders,
+        recent_paths: Vec::new(),
+        pinned_paths: Vec::new(),
     })
 }
 
@@ -402,17 +441,39 @@ fn folder_summary(root: &Path, path: &Path) -> CommandResult<FolderSummary> {
 }
 
 fn load_library_root(app: &AppHandle) -> CommandResult<Option<PathBuf>> {
+    Ok(load_settings(app)?.library_root)
+}
+
+fn load_settings(app: &AppHandle) -> CommandResult<Settings> {
     let settings_path = settings_path(app)?;
     if !settings_path.exists() {
-        return Ok(None);
+        return Ok(Settings::default());
     }
 
     let contents = fs::read_to_string(&settings_path)
         .map_err(|error| format!("Couldn't read LocalCanvas settings: {error}"))?;
-    let settings = serde_json::from_str::<Settings>(&contents)
-        .map_err(|error| format!("LocalCanvas settings are invalid: {error}"))?;
+    serde_json::from_str::<Settings>(&contents)
+        .map_err(|error| format!("LocalCanvas settings are invalid: {error}"))
+}
 
-    Ok(settings.library_root)
+fn with_preferences(app: &AppHandle, mut state: LibraryState) -> CommandResult<LibraryState> {
+    let settings = load_settings(app)?;
+    let Some(root) = state.root.as_ref() else {
+        return Ok(state);
+    };
+    let Some(preferences) = settings.preferences.get(root) else {
+        return Ok(state);
+    };
+    let available_paths = state.drawings.iter().map(|drawing| drawing.path.as_str()).collect::<Vec<_>>();
+    state.recent_paths = preferences.recent_paths.iter()
+        .filter(|path| available_paths.contains(&path.as_str()))
+        .cloned()
+        .collect();
+    state.pinned_paths = preferences.pinned_paths.iter()
+        .filter(|path| available_paths.contains(&path.as_str()))
+        .cloned()
+        .collect();
+    Ok(state)
 }
 
 pub fn active_library_root(app: &AppHandle) -> CommandResult<PathBuf> {

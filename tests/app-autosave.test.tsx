@@ -14,7 +14,9 @@ const libraryApi = vi.hoisted(() => ({
   searchDrawings: vi.fn(),
   readScene: vi.fn(),
   writeScene: vi.fn(),
-  importDrawing: vi.fn(),
+  pickImportScene: vi.fn(),
+  recordDrawingOpened: vi.fn(),
+  setDrawingPinned: vi.fn(),
   createDrawing: vi.fn(),
   createFolder: vi.fn(),
   deleteDrawing: vi.fn(),
@@ -66,13 +68,19 @@ const library: LibraryState = {
   root: "/tmp/localcanvas-test",
   drawings: [drawing],
   folders: [],
+  recentPaths: [],
+  pinnedPaths: [],
 };
 
 describe("App autosave wiring", () => {
   beforeEach(() => {
     canvasProps.length = 0;
     libraryApi.getState.mockReset();
-    libraryApi.importDrawing.mockReset();
+    libraryApi.pickImportScene.mockReset();
+    libraryApi.recordDrawingOpened.mockReset();
+    libraryApi.setDrawingPinned.mockReset();
+    libraryApi.createDrawing.mockReset();
+    libraryApi.writeScene.mockReset();
     libraryApi.deleteDrawing.mockReset();
     libraryApi.deleteFolder.mockReset();
     libraryApi.renameDrawing.mockReset();
@@ -80,6 +88,7 @@ describe("App autosave wiring", () => {
     libraryApi.moveDrawing.mockReset();
     libraryApi.moveFolder.mockReset();
     libraryApi.getState.mockResolvedValue(library);
+    libraryApi.recordDrawingOpened.mockResolvedValue(undefined);
   });
 
   it("keeps Canvas's post-save callback stable when an autosave completes", async () => {
@@ -91,17 +100,23 @@ describe("App autosave wiring", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Simulate completed autosave" }));
 
-    await waitFor(() => expect(libraryApi.getState).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(libraryApi.getState).toHaveBeenCalledTimes(3));
     expect(canvasProps).toHaveLength(1);
   });
 
   it("imports an existing Excalidraw file into the selected library folder", async () => {
-    libraryApi.importDrawing.mockResolvedValue(drawing);
+    libraryApi.pickImportScene.mockResolvedValue({
+      fileName: "imported.excalidraw",
+      mimeType: "application/json",
+      contents: [...new TextEncoder().encode('{"type":"excalidraw","elements":[],"appState":{},"files":{}}')],
+    });
+    libraryApi.createDrawing.mockResolvedValue({ ...drawing, path: "imported.excalidraw", title: "imported" });
+    libraryApi.writeScene.mockResolvedValue(undefined);
     render(<App />);
 
     fireEvent.click((await screen.findAllByRole("button", { name: "Import existing Excalidraw drawing" })).at(-1)!);
 
-    await waitFor(() => expect(libraryApi.importDrawing).toHaveBeenCalledWith(""));
+    await waitFor(() => expect(libraryApi.createDrawing).toHaveBeenCalledWith("", "imported"));
   });
 
   it("renames a drawing from its app context menu", async () => {

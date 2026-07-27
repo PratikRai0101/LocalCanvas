@@ -16,6 +16,8 @@ export type LibraryState = {
   root: string | null;
   drawings: DrawingSummary[];
   folders: FolderSummary[];
+  recentPaths: string[];
+  pinnedPaths: string[];
 };
 
 export type ImportedScene = {
@@ -29,6 +31,10 @@ export const libraryApi = {
   chooseRoot: () => invoke<LibraryState>("choose_library_root"),
   searchDrawings: (query: string) =>
     invoke<DrawingSummary[]>("search_drawings", { query }),
+  recordDrawingOpened: (relativePath: string) =>
+    invoke<void>("record_drawing_opened", { relativePath }),
+  setDrawingPinned: (relativePath: string, pinned: boolean) =>
+    invoke<void>("set_drawing_pinned", { relativePath, pinned }),
   readScene: (relativePath: string) =>
     invoke<string>("read_scene", { relativePath }),
   writeScene: (relativePath: string, sceneJson: string) =>

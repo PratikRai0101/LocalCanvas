@@ -69,6 +69,20 @@ pub fn search_drawings(app: AppHandle, query: String) -> CommandResult<Vec<Drawi
 }
 
 #[tauri::command]
+pub fn record_drawing_opened(app: AppHandle, relative_path: String) -> CommandResult<()> {
+    library::record_drawing_opened(&app, &relative_path)
+}
+
+#[tauri::command]
+pub fn set_drawing_pinned(
+    app: AppHandle,
+    relative_path: String,
+    pinned: bool,
+) -> CommandResult<()> {
+    library::set_drawing_pinned(&app, &relative_path, pinned)
+}
+
+#[tauri::command]
 pub fn read_scene(app: AppHandle, relative_path: String) -> CommandResult<String> {
     library::read_scene(&app, &relative_path)
 }

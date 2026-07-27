@@ -92,6 +92,8 @@ pub fn run() {
             commands::choose_library_root,
             commands::rebuild_index,
             commands::search_drawings,
+            commands::record_drawing_opened,
+            commands::set_drawing_pinned,
             commands::read_scene,
             commands::write_scene,
             commands::export_file,

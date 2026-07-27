@@ -25,6 +25,8 @@ const EMPTY_LIBRARY: LibraryState = {
   root: null,
   drawings: [],
   folders: [],
+  recentPaths: [],
+  pinnedPaths: [],
 };
 
 function App() {
@@ -108,7 +110,14 @@ function App() {
 
   const libraryTags = useMemo(() => [...new Set(library.drawings.flatMap((drawing) => drawing.tags))].sort(), [library.drawings]);
 
-  const recentDrawings = library.drawings.slice(0, 6);
+  const pinnedDrawings = useMemo(
+    () => drawingPathsToSummaries(library.drawings, library.pinnedPaths ?? []),
+    [library.drawings, library.pinnedPaths],
+  );
+  const recentDrawings = useMemo(
+    () => drawingPathsToSummaries(library.drawings, library.recentPaths ?? []).slice(0, 6),
+    [library.drawings, library.recentPaths],
+  );
   const handleCanvasSaved = useCallback(() => {
     void refreshLibrary();
   }, [refreshLibrary]);
@@ -134,6 +143,7 @@ function App() {
         drawing.path,
         serializeAsJSON(restored.elements, restored.appState, restored.files, "local"),
       );
+      await libraryApi.recordDrawingOpened(drawing.path);
       const nextLibrary = await refreshLibrary();
       setActiveDrawing(nextLibrary.drawings.find((item) => item.path === drawing.path) ?? drawing);
       setSelectedFolderPath(parentPath(drawing.path));
@@ -245,6 +255,7 @@ function App() {
     try {
       if (dialogKind === "drawing") {
         const drawing = await libraryApi.createDrawing(newItemFolder, newItemName);
+        await libraryApi.recordDrawingOpened(drawing.path);
         const nextLibrary = await refreshLibrary();
         setActiveDrawing(
           nextLibrary.drawings.find((item) => item.path === drawing.path) ?? drawing,
@@ -269,6 +280,23 @@ function App() {
     setSelectedFolderPath(parentPath(drawing.path));
     handleSaveStatus("saved");
     setError(null);
+    void libraryApi.recordDrawingOpened(drawing.path)
+      .then(() => refreshLibrary())
+      .catch((cause) => setError(asMessage(cause, "Couldn’t update recent drawings.")));
+  }
+
+  async function togglePinnedDrawing() {
+    if (!contextTarget || contextTarget.kind !== "drawing") {
+      return;
+    }
+    const target = contextTarget;
+    setContextTarget(null);
+    try {
+      await libraryApi.setDrawingPinned(target.path, !(library.pinnedPaths ?? []).includes(target.path));
+      await refreshLibrary();
+    } catch (cause) {
+      setError(asMessage(cause, "Couldn’t update the pinned drawing."));
+    }
   }
 
   function browseFolder(path: string) {
@@ -520,7 +548,25 @@ function App() {
               </div>
             </nav>
 
-            <section className="recent-section" aria-label="Recently modified drawings">
+            {pinnedDrawings.length > 0 && (
+              <section className="recent-section" aria-label="Pinned drawings">
+                <p className="section-label">PINNED</p>
+                {pinnedDrawings.map((drawing) => (
+                  <button
+                    className="recent-item"
+                    key={drawing.path}
+                    type="button"
+                    onClick={() => selectDrawing(drawing)}
+                    onContextMenu={(event) => openContextMenu(event, { kind: "drawing", path: drawing.path, label: drawing.title })}
+                  >
+                    <span className="recent-thumbnail" aria-hidden="true">★</span>
+                    <span><strong>{drawing.title}</strong><small>{drawing.path}</small></span>
+                  </button>
+                ))}
+              </section>
+            )}
+
+            <section className="recent-section" aria-label="Recently opened drawings">
               <p className="section-label">RECENT</p>
               {recentDrawings.length ? (
                 recentDrawings.map((drawing) => (
@@ -629,6 +675,7 @@ function App() {
         >
           <button type="button" role="menuitem" onClick={() => openEditDialog("rename")}>Rename…</button>
           <button type="button" role="menuitem" onClick={() => openEditDialog("move")}>Move to…</button>
+          {contextTarget.kind === "drawing" && <button type="button" role="menuitem" onClick={() => void togglePinnedDrawing()}>{(library.pinnedPaths ?? []).includes(contextTarget.path) ? "Unpin drawing" : "Pin drawing"}</button>}
           {contextTarget.kind === "drawing" && <button type="button" role="menuitem" onClick={() => void openTagDialog()}>Edit Finder tags…</button>}
           <div className="context-menu-separator" />
           <button type="button" role="menuitem" className="context-menu-danger" onClick={() => void deleteContextTarget()}>
@@ -803,6 +850,14 @@ function DrawingItem({ drawing, active, onSelect, onContextMenu }: {
 
 function folderDepth(path: string) {
   return path ? path.split("/").length - 1 : 0;
+}
+
+function drawingPathsToSummaries(drawings: DrawingSummary[], paths: string[]) {
+  const drawingsByPath = new Map(drawings.map((drawing) => [drawing.path, drawing]));
+  return paths.flatMap((path) => {
+    const drawing = drawingsByPath.get(path);
+    return drawing ? [drawing] : [];
+  });
 }
 
 function parentPath(path: string) {
