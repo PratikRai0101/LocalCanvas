@@ -26,12 +26,6 @@ export type ImportedScene = {
   contents: number[];
 };
 
-export type ImportedImage = {
-  fileName: string;
-  mimeType: string;
-  contents: number[];
-};
-
 export type GraphData = {
   nodes: Array<{ id: string; path: string; title: string }>;
   edges: Array<{ sourceId: string; targetId: string }>;
@@ -59,7 +53,6 @@ export const libraryApi = {
     invoke<string | null>("read_thumbnail", { relativePath }),
   writeThumbnail: (relativePath: string, thumbnailSvg: string) =>
     invoke<void>("write_thumbnail", { relativePath, thumbnailSvg }),
-  pickImage: () => invoke<ImportedImage>("pick_image"),
   pickImportScene: () => invoke<ImportedScene>("pick_import_scene"),
   createDrawing: (parentPath: string, title: string) =>
     invoke<DrawingSummary>("create_drawing", { parentPath, title }),

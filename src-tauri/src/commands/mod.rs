@@ -16,13 +16,6 @@ pub struct ImportedScene {
     pub contents: Vec<u8>,
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ImportedImage {
-    pub file_name: String,
-    pub mime_type: String,
-    pub contents: Vec<u8>,
-}
 use tauri_plugin_dialog::DialogExt;
 
 #[tauri::command]
@@ -130,51 +123,6 @@ pub fn write_thumbnail(
     thumbnail_svg: String,
 ) -> CommandResult<()> {
     library::write_thumbnail(&app, &relative_path, &thumbnail_svg)
-}
-
-#[tauri::command]
-pub async fn pick_image(app: AppHandle) -> CommandResult<ImportedImage> {
-    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
-    app.dialog()
-        .file()
-        .set_title("Add image to canvas")
-        .add_filter("Images", &["png", "jpg", "jpeg", "gif", "webp", "svg"])
-        .pick_file(move |selected| {
-            let _ = sender.send(selected);
-        });
-    let selected = tauri::async_runtime::spawn_blocking(move || receiver.recv())
-        .await
-        .map_err(|error| format!("Image dialog task failed: {error}"))?
-        .map_err(|error| format!("Image dialog closed unexpectedly: {error}"))?;
-    let Some(selected) = selected else {
-        return Err("No image was selected.".to_owned());
-    };
-    let path: PathBuf = selected
-        .into_path()
-        .map_err(|error| format!("Couldn't use the selected image: {error}"))?;
-    let extension = path.extension().and_then(|value| value.to_str()).unwrap_or_default();
-    let mime_type = image_mime_type(extension)?;
-    let file_name = path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("image")
-        .to_owned();
-    let contents = tauri::async_runtime::spawn_blocking(move || fs::read(path))
-        .await
-        .map_err(|error| format!("Image read task failed: {error}"))?
-        .map_err(|error| format!("Couldn't read the selected image: {error}"))?;
-    Ok(ImportedImage { file_name, mime_type: mime_type.to_owned(), contents })
-}
-
-fn image_mime_type(extension: &str) -> CommandResult<&'static str> {
-    match extension.to_ascii_lowercase().as_str() {
-        "png" => Ok("image/png"),
-        "jpg" | "jpeg" => Ok("image/jpeg"),
-        "gif" => Ok("image/gif"),
-        "webp" => Ok("image/webp"),
-        "svg" => Ok("image/svg+xml"),
-        _ => Err("Unsupported image format.".to_owned()),
-    }
 }
 
 #[tauri::command]

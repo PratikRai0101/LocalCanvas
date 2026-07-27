@@ -149,7 +149,6 @@ kbd { padding: 1px 4px; color: #9e9ba1; background: #fff; border: 1px solid #e4e
 .localcanvas-canvas-actions button { padding: 6px 9px; color: #4e4b54; background: rgba(255, 255, 255, .94); border: 1px solid #dedce0; border-radius: 6px; box-shadow: 0 1px 3px rgba(0, 0, 0, .08); cursor: pointer; font: 600 11px Inter, sans-serif; }
 .localcanvas-canvas-actions button:hover:not(:disabled) { border-color: #aaa6df; color: #5f5ab9; }
 .localcanvas-canvas-actions button:disabled { cursor: wait; opacity: .6; }
-.canvas-image-error { position: absolute; z-index: 4; top: 14px; left: 50%; max-width: 430px; padding: 8px 12px; color: #9d3e42; background: #fff1f1; border: 1px solid #f0c6c8; border-radius: 6px; box-shadow: 0 3px 12px rgba(0, 0, 0, .1); font-size: 12px; transform: translateX(-50%); }
 .portal-picker { position: absolute; z-index: 3; top: 50px; right: 14px; width: 240px; padding: 12px; color: #4e4b54; background: #fff; border: 1px solid #dedce0; border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .14); font-size: 11px; }
 .portal-picker label { display: grid; gap: 6px; font-weight: 600; }
 .portal-picker select { width: 100%; padding: 6px; color: inherit; border: 1px solid #dedce0; border-radius: 4px; background: #fff; font: inherit; }
