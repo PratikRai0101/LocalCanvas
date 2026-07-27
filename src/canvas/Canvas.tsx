@@ -18,7 +18,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { DrawingSummary, libraryApi } from "../library/api";
 import { clientPositionInCanvas, isSupportedImagePath } from "./nativeImageDrop";
 import { LayersPanel } from "./LayersPanel";
-import { layerEntries, moveLayer, setLayerLocked, setLayerVisibility } from "./layers";
+import { layerEntries, layerSignature, moveLayer, setLayerLocked, setLayerVisibility } from "./layers";
 import { presentationFrames } from "./presentation";
 import { createPortalElements, ensureDrawingIdentity, portalTargetForSelection } from "./portalMetadata";
 import type { PortalLink } from "./portalMetadata";
@@ -70,6 +70,7 @@ export function Canvas({
   const unsubscribePortalPointer = useRef<(() => void) | null>(null);
   const saveTimer = useRef<number | null>(null);
   const autosaveSuspended = useRef(false);
+  const layerSignatureRef = useRef("");
   const [isPortalPickerOpen, setIsPortalPickerOpen] = useState(false);
   const [frameCount, setFrameCount] = useState(0);
   const [presentationSlides, setPresentationSlides] = useState<PresentationFrame[]>([]);
@@ -202,7 +203,9 @@ export function Canvas({
 
   useEffect(() => {
     if (isLayersOpen) {
-      setLayerElements(excalidrawApi.current?.getSceneElementsIncludingDeleted() ?? []);
+      const elements = excalidrawApi.current?.getSceneElementsIncludingDeleted() ?? [];
+      layerSignatureRef.current = layerSignature(elements);
+      setLayerElements(elements);
     }
   }, [isLayersOpen]);
 
@@ -218,6 +221,7 @@ export function Canvas({
     const api = excalidrawApi.current;
     if (!api) return;
     const next = update(api.getSceneElementsIncludingDeleted());
+    layerSignatureRef.current = layerSignature(next);
     api.updateScene({ elements: next });
     setLayerElements(next);
   }, []);
@@ -433,7 +437,11 @@ export function Canvas({
       };
       setFrameCount(presentationFrames(change[0]).length);
       if (isLayersOpen) {
-        setLayerElements(change[0]);
+        const nextLayerSignature = layerSignature(change[0]);
+        if (nextLayerSignature !== layerSignatureRef.current) {
+          layerSignatureRef.current = nextLayerSignature;
+          setLayerElements(change[0]);
+        }
       }
 
       if (presentationActive.current) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { layerEntries, moveLayer, setLayerVisibility } from "../src/canvas/layers";
+import { layerEntries, layerSignature, moveLayer, setLayerVisibility } from "../src/canvas/layers";
 
 const elements = [
   { id: "metadata", type: "rectangle", isDeleted: false, opacity: 0, locked: true, customData: { localcanvas: { kind: "drawing-metadata", drawingId: "drawing-id" } } },
@@ -14,6 +14,12 @@ describe("layers", () => {
       ["note", "Architecture note"],
       ["back", "Rectangle"],
     ]);
+  });
+
+  it("does not refresh layers for a position-only canvas change", () => {
+    const moved = elements.map((element) => element.id === "back" ? { ...element, x: 400, y: 200 } : element) as never;
+
+    expect(layerSignature(moved)).toBe(layerSignature(elements));
   });
 
   it("moves a layer forward without moving the drawing metadata", () => {

@@ -25,6 +25,15 @@ export function layerEntries(elements: readonly ExcalidrawElement[]): LayerEntry
     .reverse();
 }
 
+// Positions change on every pointer-move. The panel only needs to refresh for
+// information it actually displays, which keeps canvas dragging independent of
+// React list rendering.
+export function layerSignature(elements: readonly ExcalidrawElement[]) {
+  return layerEntries(elements)
+    .map((layer) => `${layer.id}\u0000${layer.label}\u0000${layer.hidden}\u0000${layer.locked}`)
+    .join("\u0001");
+}
+
 export function moveLayer(
   elements: readonly ExcalidrawElement[],
   id: string,
