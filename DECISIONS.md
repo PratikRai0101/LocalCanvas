@@ -46,3 +46,11 @@ Status: Accepted
 Context: Local LLMs (the author's existing model roster) are more reliable at generating well-known structured text formats like Mermaid than at emitting precise coordinate-based JSON for arbitrary diagram layouts.
 Decision: Text-to-diagram default path is LLM → Mermaid syntax → `@excalidraw/mermaid-to-excalidraw` conversion → canvas elements, rather than prompting the LLM to emit Excalidraw's element schema directly.
 Consequences: Higher reliability with weaker/smaller local models. Slightly less layout flexibility than direct JSON generation would theoretically allow — acceptable since a "generate raw JSON" path can be added later as an advanced option without breaking the default.
+
+## ADR-005: Use path-derived keys only inside the rebuildable search index until portal IDs ship
+
+Date: 2026-07-27
+Status: Accepted
+Context: Full-text search needs an index before the portal feature introduces durable drawing UUIDs. Persisting a UUID only in SQLite or a sidecar would violate the rule that the index is fully rebuildable from drawing files.
+Decision: The search-only SQLite index derives its internal `drawings.id` from the drawing's current relative path. It is a cache key only, never exposed as a durable drawing identity and never used for portal links. The portal slice must introduce a durable source-of-truth UUID in element `customData` before writing `links` rows.
+Consequences: Search remains correct after a rename because the index is rebuilt from disk, while backlinks and portal navigation deliberately remain unavailable until durable IDs exist. No identity metadata is added to scene-level JSON.
