@@ -31,6 +31,8 @@ export const libraryApi = {
   chooseRoot: () => invoke<LibraryState>("choose_library_root"),
   searchDrawings: (query: string) =>
     invoke<DrawingSummary[]>("search_drawings", { query }),
+  getBacklinks: (relativePath: string) =>
+    invoke<DrawingSummary[]>("get_backlinks", { relativePath }),
   recordDrawingOpened: (relativePath: string) =>
     invoke<void>("record_drawing_opened", { relativePath }),
   setDrawingPinned: (relativePath: string, pinned: boolean) =>

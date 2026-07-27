@@ -41,6 +41,7 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<DrawingSummary[] | null>(null);
+  const [backlinks, setBacklinks] = useState<DrawingSummary[]>([]);
   const handleSaveStatus = useCallback((status: SaveStatus) => {
     if (status === "error") {
       setError("Couldn’t save this drawing. Your latest changes may not be on disk.");
@@ -99,6 +100,26 @@ function App() {
       window.clearTimeout(timer);
     };
   }, [library.root, query]);
+
+  useEffect(() => {
+    if (!activeDrawing || !library.root) {
+      setBacklinks([]);
+      return;
+    }
+
+    let cancelled = false;
+    void libraryApi.getBacklinks(activeDrawing.path)
+      .then((results) => {
+        if (!cancelled) {
+          setBacklinks((current) => sameDrawingPaths(current, results) ? current : results);
+        }
+      })
+      .catch((cause) => {
+        console.error("Failed to load backlinks", cause);
+        if (!cancelled) setBacklinks([]);
+      });
+    return () => { cancelled = true; };
+  }, [activeDrawing?.path, library.drawings, library.root]);
 
   const visibleDrawings = useMemo(() => {
     const searchedDrawings = query.trim() ? searchResults ?? [] : library.drawings;
@@ -630,14 +651,26 @@ function App() {
         {!library.root ? (
           <Welcome onChoose={() => void chooseLibraryRoot()} isChoosing={isChoosingRoot} />
         ) : activeDrawing ? (
-          <Canvas
-            key={activeDrawing.path}
-            drawingPath={activeDrawing.path}
-            drawingTitle={activeDrawing.title}
-            onSaveStatus={handleSaveStatus}
-            onSaved={handleCanvasSaved}
-            portalTargets={library.drawings.filter((drawing) => drawing.path !== activeDrawing.path)}
-          />
+          <>
+            <Canvas
+              key={activeDrawing.path}
+              drawingPath={activeDrawing.path}
+              drawingTitle={activeDrawing.title}
+              onSaveStatus={handleSaveStatus}
+              onSaved={handleCanvasSaved}
+              portalTargets={library.drawings.filter((drawing) => drawing.path !== activeDrawing.path)}
+            />
+            {backlinks.length > 0 && (
+              <aside className="backlinks-panel" aria-label="Backlinks">
+                <p>BACKLINKS</p>
+                {backlinks.map((drawing) => (
+                  <button key={drawing.path} type="button" onClick={() => selectDrawing(drawing)}>
+                    ← {drawing.title}
+                  </button>
+                ))}
+              </aside>
+            )}
+          </>
         ) : library.drawings.length ? (
           <ThumbnailGrid
             drawings={visibleDrawings}
@@ -851,6 +884,10 @@ function DrawingItem({ drawing, active, onSelect, onContextMenu }: {
 
 function folderDepth(path: string) {
   return path ? path.split("/").length - 1 : 0;
+}
+
+function sameDrawingPaths(left: DrawingSummary[], right: DrawingSummary[]) {
+  return left.length === right.length && left.every((drawing, index) => drawing.path === right[index]?.path);
 }
 
 function drawingPathsToSummaries(drawings: DrawingSummary[], paths: string[]) {

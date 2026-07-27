@@ -69,6 +69,11 @@ pub fn search_drawings(app: AppHandle, query: String) -> CommandResult<Vec<Drawi
 }
 
 #[tauri::command]
+pub fn get_backlinks(app: AppHandle, relative_path: String) -> CommandResult<Vec<DrawingSummary>> {
+    index::backlinks(&library::active_library_root(&app)?, &relative_path)
+}
+
+#[tauri::command]
 pub fn record_drawing_opened(app: AppHandle, relative_path: String) -> CommandResult<()> {
     library::record_drawing_opened(&app, &relative_path)
 }

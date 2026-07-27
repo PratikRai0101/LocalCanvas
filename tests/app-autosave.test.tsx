@@ -12,6 +12,7 @@ const libraryApi = vi.hoisted(() => ({
   getState: vi.fn(),
   chooseRoot: vi.fn(),
   searchDrawings: vi.fn(),
+  getBacklinks: vi.fn(),
   readScene: vi.fn(),
   writeScene: vi.fn(),
   pickImportScene: vi.fn(),
@@ -76,6 +77,7 @@ describe("App autosave wiring", () => {
   beforeEach(() => {
     canvasProps.length = 0;
     libraryApi.getState.mockReset();
+    libraryApi.getBacklinks.mockReset();
     libraryApi.pickImportScene.mockReset();
     libraryApi.recordDrawingOpened.mockReset();
     libraryApi.setDrawingPinned.mockReset();
@@ -88,6 +90,7 @@ describe("App autosave wiring", () => {
     libraryApi.moveDrawing.mockReset();
     libraryApi.moveFolder.mockReset();
     libraryApi.getState.mockResolvedValue(library);
+    libraryApi.getBacklinks.mockResolvedValue([]);
     libraryApi.recordDrawingOpened.mockResolvedValue(undefined);
   });
 

@@ -39,8 +39,8 @@ pub fn rebuild(root: &Path) -> CommandResult<IndexStats> {
         .map_err(|error| format!("Couldn't reset search index: {error}"))?;
 
     let mut indexed_text_elements = 0;
-    for entry in entries {
-        let document_id = cache_id(&entry.path);
+    for entry in &entries {
+        let document_id = drawing_id(&entry.contents).unwrap_or_else(|| cache_id(&entry.path));
         let text = extract_text(&entry.contents);
         indexed_text_elements += text.len();
         let content = text.join("\n");
@@ -54,9 +54,20 @@ pub fn rebuild(root: &Path) -> CommandResult<IndexStats> {
         transaction
             .execute(
                 "INSERT INTO text_index (drawing_id, content) VALUES (?1, ?2)",
-                params![cache_id(&entry.path), content],
+                params![document_id, content],
             )
             .map_err(|error| format!("Couldn't add drawing text to index: {error}"))?;
+    }
+    for entry in entries {
+        let source_id = drawing_id(&entry.contents).unwrap_or_else(|| cache_id(&entry.path));
+        for target_id in portal_target_ids(&entry.contents) {
+            transaction
+                .execute(
+                    "INSERT INTO links (source_id, target_id) VALUES (?1, ?2)",
+                    params![source_id, target_id],
+                )
+                .map_err(|error| format!("Couldn't add drawing link to index: {error}"))?;
+        }
     }
 
     transaction
@@ -67,6 +78,39 @@ pub fn rebuild(root: &Path) -> CommandResult<IndexStats> {
         drawing_count,
         indexed_text_elements,
     })
+}
+
+pub fn backlinks(root: &Path, relative_path: &str) -> CommandResult<Vec<DrawingSummary>> {
+    let database_path = root.join(CACHE_DIRECTORY).join(DATABASE_FILE);
+    if !database_path.exists() {
+        rebuild(root)?;
+    }
+    let connection = Connection::open(&database_path)
+        .map_err(|error| format!("Couldn't open search index: {error}"))?;
+    let mut statement = connection
+        .prepare(
+            "SELECT source.path, source.title, source.updated_at
+             FROM links
+             JOIN drawings AS target ON target.id = links.target_id
+             JOIN drawings AS source ON source.id = links.source_id
+             WHERE target.path = ?1
+             ORDER BY source.updated_at DESC",
+        )
+        .map_err(|error| format!("Couldn't prepare backlink query: {error}"))?;
+    let results = statement
+        .query_map(params![relative_path], |row| {
+            let modified_at: String = row.get(2)?;
+            Ok(DrawingSummary {
+                path: row.get(0)?,
+                title: row.get(1)?,
+                modified_at: modified_at.parse().unwrap_or_default(),
+                tags: Vec::new(),
+            })
+        })
+        .map_err(|error| format!("Couldn't query backlinks: {error}"))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| format!("Couldn't read backlink results: {error}"))?;
+    Ok(results)
 }
 
 pub fn search(root: &Path, query: &str) -> CommandResult<Vec<DrawingSummary>> {
@@ -222,6 +266,35 @@ fn indexed_drawing(root: &Path, path: &Path) -> CommandResult<IndexedDrawing> {
     })
 }
 
+fn drawing_id(contents: &str) -> Option<String> {
+    metadata_elements(contents).find_map(|element| {
+        let localcanvas = element.get("customData")?.get("localcanvas")?;
+        (localcanvas.get("kind")?.as_str() == Some("drawing-metadata"))
+            .then(|| localcanvas.get("drawingId")?.as_str().map(ToOwned::to_owned))
+            .flatten()
+    })
+}
+
+fn portal_target_ids(contents: &str) -> Vec<String> {
+    metadata_elements(contents)
+        .filter(|element| !element.get("isDeleted").and_then(Value::as_bool).unwrap_or(false))
+        .filter_map(|element| {
+            let localcanvas = element.get("customData")?.get("localcanvas")?;
+            (localcanvas.get("kind")?.as_str() == Some("portal"))
+                .then(|| localcanvas.get("targetId")?.as_str().map(ToOwned::to_owned))
+                .flatten()
+        })
+        .collect()
+}
+
+fn metadata_elements(contents: &str) -> impl Iterator<Item = Value> {
+    serde_json::from_str::<Value>(contents)
+        .ok()
+        .and_then(|scene| scene.get("elements")?.as_array().cloned())
+        .unwrap_or_default()
+        .into_iter()
+}
+
 fn extract_text(contents: &str) -> Vec<String> {
     let Ok(scene) = serde_json::from_str::<Value>(contents) else {
         return Vec::new();
@@ -272,7 +345,7 @@ fn content_hash(contents: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{rebuild, search};
+    use super::{backlinks, rebuild, search};
     use std::{env, fs};
     use uuid::Uuid;
 
@@ -303,6 +376,29 @@ mod tests {
             "roadmap.excalidraw"
         );
         assert!(search(&root, "ignored").unwrap().is_empty());
+
+        fs::remove_dir_all(root).expect("remove test library");
+    }
+
+    #[test]
+    fn rebuilds_portal_links_and_returns_backlinks() {
+        let root = env::temp_dir().join(format!("localcanvas-index-test-{}", Uuid::new_v4()));
+        fs::create_dir_all(&root).expect("create test library");
+        fs::write(
+            root.join("target.excalidraw"),
+            r#"{"type":"excalidraw","elements":[{"type":"rectangle","isDeleted":false,"customData":{"localcanvas":{"kind":"drawing-metadata","drawingId":"target-id"}}}],"appState":{},"files":{}}"#,
+        )
+        .expect("write target drawing");
+        fs::write(
+            root.join("source.excalidraw"),
+            r#"{"type":"excalidraw","elements":[{"type":"rectangle","isDeleted":false,"customData":{"localcanvas":{"kind":"drawing-metadata","drawingId":"source-id"}}},{"type":"rectangle","isDeleted":false,"customData":{"localcanvas":{"kind":"portal","targetId":"target-id","targetPath":"target.excalidraw"}}}],"appState":{},"files":{}}"#,
+        )
+        .expect("write source drawing");
+
+        rebuild(&root).expect("build portal index");
+        let results = backlinks(&root, "target.excalidraw").expect("query backlinks");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].path, "source.excalidraw");
 
         fs::remove_dir_all(root).expect("remove test library");
     }
