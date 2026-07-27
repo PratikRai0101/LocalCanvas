@@ -101,6 +101,7 @@ pub fn run() {
             commands::write_scene,
             commands::read_thumbnail,
             commands::write_thumbnail,
+            commands::read_dropped_image,
             commands::pick_import_scene,
             commands::create_drawing,
             commands::create_folder,

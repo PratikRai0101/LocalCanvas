@@ -16,6 +16,16 @@ pub struct ImportedScene {
     pub contents: Vec<u8>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DroppedImage {
+    pub file_name: String,
+    pub mime_type: String,
+    pub contents: Vec<u8>,
+}
+
+const MAX_DROPPED_IMAGE_BYTES: u64 = 25 * 1024 * 1024;
+
 use tauri_plugin_dialog::DialogExt;
 
 #[tauri::command]
@@ -123,6 +133,34 @@ pub fn write_thumbnail(
     thumbnail_svg: String,
 ) -> CommandResult<()> {
     library::write_thumbnail(&app, &relative_path, &thumbnail_svg)
+}
+
+#[tauri::command]
+pub fn read_dropped_image(path: String) -> CommandResult<DroppedImage> {
+    let path = PathBuf::from(path);
+    let extension = path.extension().and_then(|value| value.to_str()).unwrap_or_default();
+    let mime_type = match extension.to_ascii_lowercase().as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "svg" => "image/svg+xml",
+        _ => return Err("Unsupported image format.".to_owned()),
+    };
+    let metadata = fs::metadata(&path).map_err(|error| format!("Couldn't inspect the dropped image: {error}"))?;
+    if !metadata.is_file() {
+        return Err("The dropped item isn't a file.".to_owned());
+    }
+    if metadata.len() > MAX_DROPPED_IMAGE_BYTES {
+        return Err("Images larger than 25 MB can't be added to a canvas.".to_owned());
+    }
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("image")
+        .to_owned();
+    let contents = fs::read(path).map_err(|error| format!("Couldn't read the dropped image: {error}"))?;
+    Ok(DroppedImage { file_name, mime_type: mime_type.to_owned(), contents })
 }
 
 #[tauri::command]
