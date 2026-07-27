@@ -21,7 +21,7 @@ notify = "8"
 plist = "1"
 sha2 = "0.11"
 xattr = "1"
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-dialog = "2"
 uuid = { version = "1", features = ["v4"] }
 walkdir = "2"

@@ -6,7 +6,8 @@ mod watcher;
 
 use tauri::{
     menu::{MenuBuilder, MenuItemBuilder, SubmenuBuilder},
-    Emitter,
+    tray::TrayIconBuilder,
+    Emitter, Manager,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -32,6 +33,34 @@ pub fn run() {
                 .build(app)?;
             let toggle_layers = MenuItemBuilder::with_id("toggle-layers", "Layers")
                 .accelerator("CmdOrCtrl+Shift+L")
+                .build(app)?;
+            let quick_capture =
+                MenuItemBuilder::with_id("quick-capture", "New Quick Canvas").build(app)?;
+            let show_window =
+                MenuItemBuilder::with_id("show-window", "Show LocalCanvas").build(app)?;
+            let tray_menu = MenuBuilder::new(app)
+                .item(&quick_capture)
+                .item(&show_window)
+                .separator()
+                .quit()
+                .build()?;
+            let tray_icon = app
+                .default_window_icon()
+                .cloned()
+                .ok_or_else(|| "LocalCanvas needs an application icon for quick capture.")?;
+            TrayIconBuilder::with_id("quick-capture")
+                .icon(tray_icon)
+                .icon_as_template(true)
+                .tooltip("LocalCanvas")
+                .menu(&tray_menu)
+                .on_menu_event(|app, event| match event.id().as_ref() {
+                    "quick-capture" => {
+                        show_main_window(app);
+                        let _ = app.emit("menu-action", "quick-capture");
+                    }
+                    "show-window" => show_main_window(app),
+                    _ => {}
+                })
                 .build(app)?;
 
             let app_menu = SubmenuBuilder::new(app, "LocalCanvas")
@@ -126,4 +155,12 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running LocalCanvas");
+}
+
+fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
 }
