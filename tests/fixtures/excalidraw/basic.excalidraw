@@ -1,0 +1,47 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "https://excalidraw.com",
+  "elements": [
+    {
+      "id": "portal-rectangle",
+      "type": "rectangle",
+      "x": 120,
+      "y": 80,
+      "width": 260,
+      "height": 120,
+      "angle": 0,
+      "strokeColor": "#1e1e1e",
+      "backgroundColor": "transparent",
+      "fillStyle": "solid",
+      "strokeWidth": 2,
+      "strokeStyle": "dashed",
+      "roughness": 1,
+      "opacity": 100,
+      "groupIds": [],
+      "frameId": null,
+      "index": "a0",
+      "roundness": { "type": 3 },
+      "seed": 208281313,
+      "version": 1,
+      "versionNonce": 1608917377,
+      "isDeleted": false,
+      "boundElements": null,
+      "updated": 1710000000000,
+      "link": null,
+      "locked": false,
+      "customData": {
+        "localcanvas": {
+          "kind": "portal",
+          "targetId": "b2f1c9e0-1111-2222-3333-444444444444",
+          "targetPath": "Architecture/db-schema.excalidraw"
+        }
+      }
+    }
+  ],
+  "appState": {
+    "gridSize": null,
+    "viewBackgroundColor": "#ffffff"
+  },
+  "files": {}
+}
