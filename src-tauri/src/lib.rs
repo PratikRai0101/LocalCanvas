@@ -1,6 +1,7 @@
 mod commands;
 mod fs;
 mod index;
+mod ocr;
 mod watcher;
 
 use tauri::{
@@ -110,6 +111,7 @@ pub fn run() {
             commands::read_thumbnail,
             commands::write_thumbnail,
             commands::read_dropped_image,
+            commands::recognize_image_text,
             commands::pick_import_scene,
             commands::create_drawing,
             commands::create_folder,

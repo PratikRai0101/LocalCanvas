@@ -204,6 +204,11 @@ pub fn read_dropped_image(path: String) -> CommandResult<DroppedImage> {
 }
 
 #[tauri::command]
+pub fn recognize_image_text(image_bytes: Vec<u8>) -> CommandResult<String> {
+    crate::ocr::recognize_image_text(&image_bytes)
+}
+
+#[tauri::command]
 pub fn pick_import_scene(app: AppHandle) -> CommandResult<ImportedScene> {
     let selected = app
         .dialog()
