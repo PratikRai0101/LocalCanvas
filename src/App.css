@@ -1,0 +1,17 @@
+:root {
+  color: #27272c;
+  background: #fefefe;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+}
+
+body { margin: 0; }
+
+.bootstrap-screen {
+  display: grid;
+  width: 100vw;
+  height: 100vh;
+  place-items: center;
+  color: #6965db;
+  font-size: 24px;
+  font-weight: 700;
+}
