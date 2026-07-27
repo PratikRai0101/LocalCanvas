@@ -150,6 +150,16 @@ kbd, .search-shortcut { padding: 1px 4px; color: #9e9ba1; background: #fff; bord
 
 .canvas-host { position: relative; min-height: 0; flex: 1; }
 .canvas-host > div { height: 100%; }
+.app-shell:has(.presentation-mode) .sidebar, .app-shell:has(.presentation-mode) .workspace-header { display: none; }
+.app-shell:has(.presentation-mode) .workspace { position: fixed; inset: 0; z-index: 50; }
+.canvas-host.is-presenting .excalidraw .layer-ui__wrapper { display: none; }
+.presentation-mode { position: fixed; inset: 0; z-index: 52; display: flex; align-items: flex-end; justify-content: center; padding: 24px; pointer-events: none; background: transparent; }
+.presentation-controls { display: flex; align-items: center; gap: 5px; padding: 6px; color: #dedbe7; pointer-events: auto; background: rgba(24, 24, 30, .88); border: 1px solid rgba(255, 255, 255, .15); border-radius: 8px; box-shadow: 0 7px 22px rgba(0, 0, 0, .22); font: 600 11px Inter, sans-serif; }
+.presentation-controls span { min-width: 44px; padding: 0 4px; text-align: center; }
+.presentation-controls button { min-width: 29px; height: 28px; padding: 0 8px; color: #f4f2f9; background: transparent; border: 0; border-radius: 5px; font: 600 13px Inter, sans-serif; }
+.presentation-controls button:hover:not(:disabled) { background: rgba(255, 255, 255, .15); }
+.presentation-controls button:disabled { opacity: .35; }
+.presentation-mode > p { position: absolute; bottom: -3px; margin: 0; color: rgba(255, 255, 255, .72); font-size: 10px; pointer-events: none; }
 .localcanvas-canvas-actions { display: flex; gap: 5px; }
 .localcanvas-canvas-actions button { padding: 6px 9px; color: #4e4b54; background: rgba(255, 255, 255, .94); border: 1px solid #dedce0; border-radius: 6px; box-shadow: 0 1px 3px rgba(0, 0, 0, .08); cursor: pointer; font: 600 11px Inter, sans-serif; }
 .localcanvas-canvas-actions button:hover:not(:disabled) { border-color: #aaa6df; color: #5f5ab9; }

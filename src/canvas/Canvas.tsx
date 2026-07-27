@@ -16,6 +16,7 @@ import type {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DrawingSummary, libraryApi } from "../library/api";
 import { clientPositionInCanvas, isSupportedImagePath } from "./nativeImageDrop";
+import { presentationFrames } from "./presentation";
 import { createPortalElements, ensureDrawingIdentity, portalTargetForSelection } from "./portalMetadata";
 import type { PortalLink } from "./portalMetadata";
 
@@ -37,6 +38,7 @@ type SceneSnapshot = {
   appState: SceneChange[1];
   files: SceneChange[2];
 };
+type PresentationFrame = Extract<SceneChange[0][number], { type: "frame" | "magicframe" }>;
 
 const AUTOSAVE_DELAY_MS = 800;
 
@@ -56,10 +58,15 @@ export function Canvas({
   const canvasHost = useRef<HTMLDivElement | null>(null);
   const excalidrawApi = useRef<ExcalidrawImperativeAPI | null>(null);
   const isInsertingNativeDrop = useRef(false);
+  const presentationActive = useRef(false);
   const onOpenPortalRef = useRef(onOpenPortal);
   const unsubscribePortalPointer = useRef<(() => void) | null>(null);
   const saveTimer = useRef<number | null>(null);
   const [isPortalPickerOpen, setIsPortalPickerOpen] = useState(false);
+  const [frameCount, setFrameCount] = useState(0);
+  const [presentationSlides, setPresentationSlides] = useState<PresentationFrame[]>([]);
+  const [presentationSlideIndex, setPresentationSlideIndex] = useState(0);
+  const [isPresenting, setIsPresenting] = useState(false);
   const [usesNativeFileDrops, setUsesNativeFileDrops] = useState(false);
   const [portalTargetPath, setPortalTargetPath] = useState("");
   const [isCreatingPortal, setIsCreatingPortal] = useState(false);
@@ -135,6 +142,7 @@ export function Canvas({
         }
         if (!cancelled) {
           setInitialData({ ...restored, elements: identity.elements });
+          setFrameCount(presentationFrames(identity.elements).length);
           onSaveStatus("saved");
         }
       } catch (error) {
@@ -173,6 +181,66 @@ export function Canvas({
     },
     [flushAutosave],
   );
+
+  const startPresentation = useCallback(() => {
+    const api = excalidrawApi.current;
+    if (!api) {
+      return;
+    }
+    const slides = presentationFrames(api.getSceneElementsIncludingDeleted()) as PresentationFrame[];
+    if (!slides.length) {
+      return;
+    }
+    presentationActive.current = true;
+    setPresentationSlides(slides);
+    setPresentationSlideIndex(0);
+    setIsPresenting(true);
+  }, []);
+
+  const exitPresentation = useCallback(() => {
+    presentationActive.current = false;
+    setIsPresenting(false);
+    setPresentationSlides([]);
+  }, []);
+
+  useEffect(() => {
+    if (!isPresenting) {
+      return;
+    }
+    const slide = presentationSlides[presentationSlideIndex];
+    const api = excalidrawApi.current;
+    if (!slide || !api) {
+      return;
+    }
+    const animationFrame = window.requestAnimationFrame(() => {
+      api.scrollToContent(slide, {
+        fitToViewport: true,
+        viewportZoomFactor: 0.94,
+        animate: false,
+      });
+    });
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [isPresenting, presentationSlideIndex, presentationSlides]);
+
+  useEffect(() => {
+    if (!isPresenting) {
+      return;
+    }
+    function handlePresentationKey(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        exitPresentation();
+      } else if (event.key === "ArrowRight" || event.key === " " || event.key === "Enter") {
+        event.preventDefault();
+        setPresentationSlideIndex((index) => Math.min(index + 1, presentationSlides.length - 1));
+      } else if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        setPresentationSlideIndex((index) => Math.max(index - 1, 0));
+      }
+    }
+    window.addEventListener("keydown", handlePresentationKey, true);
+    return () => window.removeEventListener("keydown", handlePresentationKey, true);
+  }, [exitPresentation, isPresenting, presentationSlides.length]);
 
   const insertNativeDroppedImage = useCallback(async (path: string, clientX: number, clientY: number) => {
     const api = excalidrawApi.current;
@@ -318,7 +386,11 @@ export function Canvas({
         appState: change[1],
         files: change[2],
       };
+      setFrameCount(presentationFrames(change[0]).length);
 
+      if (presentationActive.current) {
+        return;
+      }
       if (saveTimer.current !== null) {
         window.clearTimeout(saveTimer.current);
       }
@@ -345,7 +417,7 @@ export function Canvas({
 
   return (
     <div
-      className="canvas-host"
+      className={`canvas-host ${isPresenting ? "is-presenting" : ""}`}
       ref={canvasHost}
       onDragOverCapture={(event) => {
         if (usesNativeFileDrops && dataTransferContainsImage(event.dataTransfer)) {
@@ -376,14 +448,30 @@ export function Canvas({
           </div>
         </div>
       )}
+      {isPresenting && (
+        <div className="presentation-mode" role="dialog" aria-modal="true" aria-label="Presentation mode">
+          <div className="presentation-controls">
+            <span>{presentationSlideIndex + 1} / {presentationSlides.length}</span>
+            <button type="button" onClick={() => setPresentationSlideIndex((index) => Math.max(index - 1, 0))} disabled={presentationSlideIndex === 0}>‹</button>
+            <button type="button" onClick={() => setPresentationSlideIndex((index) => Math.min(index + 1, presentationSlides.length - 1))} disabled={presentationSlideIndex === presentationSlides.length - 1}>›</button>
+            <button type="button" onClick={exitPresentation}>Exit</button>
+          </div>
+          <p>← → navigate · Esc exit</p>
+        </div>
+      )}
       <Excalidraw
         autoFocus
+        viewModeEnabled={isPresenting}
+        zenModeEnabled={isPresenting}
         excalidrawAPI={bindExcalidrawApi}
         initialData={initialData}
         name={drawingTitle}
         onChange={scheduleAutosave}
-        renderTopRightUI={() => (
+        renderTopRightUI={() => isPresenting ? null : (
           <div className="localcanvas-canvas-actions">
+            <button type="button" onClick={startPresentation} disabled={!frameCount}>
+              Present
+            </button>
             <button type="button" onClick={() => setIsPortalPickerOpen(true)} disabled={!portalTargets.length}>
               Link canvas
             </button>
