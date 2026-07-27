@@ -73,6 +73,28 @@ export function createPortalElements(target: PortalTarget, x = 100, y = 100) {
   }], { regenerateIds: false });
 }
 
+export function portalTargetPathForSelection(
+  elements: readonly ExcalidrawElement[],
+  selectedElementIds: Record<string, boolean>,
+): string | null {
+  const selected = elements.filter((element) => selectedElementIds[element.id]);
+  for (const element of selected) {
+    const targetPath = portalTargetPath(element);
+    if (targetPath) {
+      return targetPath;
+    }
+    const containerId = (element as { containerId?: string | null }).containerId;
+    if (containerId) {
+      const container = elements.find((candidate) => candidate.id === containerId);
+      const containerTargetPath = container && portalTargetPath(container);
+      if (containerTargetPath) {
+        return containerTargetPath;
+      }
+    }
+  }
+  return null;
+}
+
 export function findDrawingId(elements: readonly ElementWithCustomData[]): string | null {
   for (const element of elements) {
     const localcanvas = element.customData?.[LOCALCANVAS_KEY];
@@ -82,6 +104,17 @@ export function findDrawingId(elements: readonly ElementWithCustomData[]): strin
     return localcanvas.drawingId;
   }
   return null;
+}
+
+function portalTargetPath(element: ElementWithCustomData): string | null {
+  const localcanvas = element.customData?.[LOCALCANVAS_KEY];
+  if (!localcanvas || typeof localcanvas !== "object") {
+    return null;
+  }
+  const portal = localcanvas as { kind?: unknown; targetPath?: unknown };
+  return portal.kind === "portal" && typeof portal.targetPath === "string"
+    ? portal.targetPath
+    : null;
 }
 
 function isDrawingMetadata(value: unknown): value is DrawingMetadata {

@@ -320,6 +320,15 @@ function App() {
     }
   }
 
+  function openPortal(path: string) {
+    const target = library.drawings.find((drawing) => drawing.path === path);
+    if (target) {
+      selectDrawing(target);
+    } else {
+      setError("This portal’s target drawing is no longer in the library.");
+    }
+  }
+
   function browseFolder(path: string) {
     setSelectedFolderPath(path);
     setActiveDrawing(null);
@@ -659,6 +668,7 @@ function App() {
               onSaveStatus={handleSaveStatus}
               onSaved={handleCanvasSaved}
               portalTargets={library.drawings.filter((drawing) => drawing.path !== activeDrawing.path)}
+              onOpenPortal={openPortal}
             />
             {backlinks.length > 0 && (
               <aside className="backlinks-panel" aria-label="Backlinks">

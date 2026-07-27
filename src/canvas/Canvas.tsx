@@ -12,7 +12,7 @@ import type {
 } from "@excalidraw/excalidraw/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DrawingSummary, libraryApi } from "../library/api";
-import { createPortalElements, ensureDrawingIdentity } from "./portalMetadata";
+import { createPortalElements, ensureDrawingIdentity, portalTargetPathForSelection } from "./portalMetadata";
 
 type CanvasProps = {
   drawingPath: string;
@@ -20,6 +20,7 @@ type CanvasProps = {
   onSaveStatus: (status: SaveStatus) => void;
   onSaved: () => void;
   portalTargets: DrawingSummary[];
+  onOpenPortal: (path: string) => void;
 };
 
 export type SaveStatus = "saved" | "saving" | "error";
@@ -39,17 +40,43 @@ export function Canvas({
   onSaveStatus,
   onSaved,
   portalTargets,
+  onOpenPortal,
 }: CanvasProps) {
   const [initialData, setInitialData] =
     useState<ExcalidrawInitialDataState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const latestScene = useRef<SceneSnapshot | null>(null);
   const excalidrawApi = useRef<ExcalidrawImperativeAPI | null>(null);
+  const onOpenPortalRef = useRef(onOpenPortal);
+  const unsubscribePortalPointer = useRef<(() => void) | null>(null);
   const saveTimer = useRef<number | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isPortalPickerOpen, setIsPortalPickerOpen] = useState(false);
   const [portalTargetPath, setPortalTargetPath] = useState("");
   const [isCreatingPortal, setIsCreatingPortal] = useState(false);
+
+  useEffect(() => {
+    onOpenPortalRef.current = onOpenPortal;
+  }, [onOpenPortal]);
+
+  useEffect(() => () => unsubscribePortalPointer.current?.(), []);
+
+  const bindExcalidrawApi = useCallback((api: ExcalidrawImperativeAPI) => {
+    excalidrawApi.current = api;
+    unsubscribePortalPointer.current?.();
+    unsubscribePortalPointer.current = api.onPointerUp((_tool, _pointerState, event) => {
+      if (event.detail !== 2) {
+        return;
+      }
+      const targetPath = portalTargetPathForSelection(
+        api.getSceneElementsIncludingDeleted(),
+        api.getAppState().selectedElementIds,
+      );
+      if (targetPath) {
+        onOpenPortalRef.current(targetPath);
+      }
+    });
+  }, []);
 
   const saveLatestScene = useCallback(async () => {
     const scene = latestScene.current;
@@ -260,7 +287,7 @@ export function Canvas({
       )}
       <Excalidraw
         autoFocus
-        excalidrawAPI={(api) => { excalidrawApi.current = api; }}
+        excalidrawAPI={bindExcalidrawApi}
         initialData={initialData}
         name={drawingTitle}
         onChange={scheduleAutosave}
