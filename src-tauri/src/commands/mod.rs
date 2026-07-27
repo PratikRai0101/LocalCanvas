@@ -138,7 +138,10 @@ pub fn write_thumbnail(
 #[tauri::command]
 pub fn read_dropped_image(path: String) -> CommandResult<DroppedImage> {
     let path = PathBuf::from(path);
-    let extension = path.extension().and_then(|value| value.to_str()).unwrap_or_default();
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
     let mime_type = match extension.to_ascii_lowercase().as_str() {
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
@@ -147,7 +150,8 @@ pub fn read_dropped_image(path: String) -> CommandResult<DroppedImage> {
         "svg" => "image/svg+xml",
         _ => return Err("Unsupported image format.".to_owned()),
     };
-    let metadata = fs::metadata(&path).map_err(|error| format!("Couldn't inspect the dropped image: {error}"))?;
+    let metadata = fs::metadata(&path)
+        .map_err(|error| format!("Couldn't inspect the dropped image: {error}"))?;
     if !metadata.is_file() {
         return Err("The dropped item isn't a file.".to_owned());
     }
@@ -159,8 +163,13 @@ pub fn read_dropped_image(path: String) -> CommandResult<DroppedImage> {
         .and_then(|name| name.to_str())
         .unwrap_or("image")
         .to_owned();
-    let contents = fs::read(path).map_err(|error| format!("Couldn't read the dropped image: {error}"))?;
-    Ok(DroppedImage { file_name, mime_type: mime_type.to_owned(), contents })
+    let contents =
+        fs::read(path).map_err(|error| format!("Couldn't read the dropped image: {error}"))?;
+    Ok(DroppedImage {
+        file_name,
+        mime_type: mime_type.to_owned(),
+        contents,
+    })
 }
 
 #[tauri::command]
@@ -177,7 +186,10 @@ pub fn pick_import_scene(app: AppHandle) -> CommandResult<ImportedScene> {
     let path: PathBuf = selected
         .into_path()
         .map_err(|error| format!("Couldn't use the selected drawing: {error}"))?;
-    let extension = path.extension().and_then(|value| value.to_str()).unwrap_or_default();
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
     let mime_type = match extension.to_ascii_lowercase().as_str() {
         "excalidraw" => "application/json",
         "png" => "image/png",
@@ -189,8 +201,13 @@ pub fn pick_import_scene(app: AppHandle) -> CommandResult<ImportedScene> {
         .and_then(|name| name.to_str())
         .unwrap_or("Imported drawing")
         .to_owned();
-    let contents = fs::read(path).map_err(|error| format!("Couldn't read the selected drawing: {error}"))?;
-    Ok(ImportedScene { file_name, mime_type: mime_type.to_owned(), contents })
+    let contents =
+        fs::read(path).map_err(|error| format!("Couldn't read the selected drawing: {error}"))?;
+    Ok(ImportedScene {
+        file_name,
+        mime_type: mime_type.to_owned(),
+        contents,
+    })
 }
 
 #[tauri::command]

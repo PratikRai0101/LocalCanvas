@@ -138,11 +138,13 @@ pub fn graph(root: &Path) -> CommandResult<GraphData> {
         .prepare("SELECT id, path, title FROM drawings ORDER BY title COLLATE NOCASE")
         .map_err(|error| format!("Couldn't prepare graph query: {error}"))?;
     let nodes = node_statement
-        .query_map([], |row| Ok(GraphNode {
-            id: row.get(0)?,
-            path: row.get(1)?,
-            title: row.get(2)?,
-        }))
+        .query_map([], |row| {
+            Ok(GraphNode {
+                id: row.get(0)?,
+                path: row.get(1)?,
+                title: row.get(2)?,
+            })
+        })
         .map_err(|error| format!("Couldn't query graph nodes: {error}"))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|error| format!("Couldn't read graph nodes: {error}"))?;
@@ -155,10 +157,12 @@ pub fn graph(root: &Path) -> CommandResult<GraphData> {
         )
         .map_err(|error| format!("Couldn't prepare graph links: {error}"))?;
     let edges = edge_statement
-        .query_map([], |row| Ok(GraphEdge {
-            source_id: row.get(0)?,
-            target_id: row.get(1)?,
-        }))
+        .query_map([], |row| {
+            Ok(GraphEdge {
+                source_id: row.get(0)?,
+                target_id: row.get(1)?,
+            })
+        })
         .map_err(|error| format!("Couldn't query graph links: {error}"))?
         .collect::<Result<Vec<_>, _>>()
         .map_err(|error| format!("Couldn't read graph links: {error}"))?;
@@ -355,14 +359,24 @@ fn drawing_id(contents: &str) -> Option<String> {
     metadata_elements(contents).find_map(|element| {
         let localcanvas = element.get("customData")?.get("localcanvas")?;
         (localcanvas.get("kind")?.as_str() == Some("drawing-metadata"))
-            .then(|| localcanvas.get("drawingId")?.as_str().map(ToOwned::to_owned))
+            .then(|| {
+                localcanvas
+                    .get("drawingId")?
+                    .as_str()
+                    .map(ToOwned::to_owned)
+            })
             .flatten()
     })
 }
 
 fn portal_target_ids(contents: &str) -> Vec<String> {
     metadata_elements(contents)
-        .filter(|element| !element.get("isDeleted").and_then(Value::as_bool).unwrap_or(false))
+        .filter(|element| {
+            !element
+                .get("isDeleted")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        })
         .filter_map(|element| {
             let localcanvas = element.get("customData")?.get("localcanvas")?;
             (localcanvas.get("kind")?.as_str() == Some("portal"))
@@ -490,7 +504,10 @@ mod tests {
         assert_eq!(graph.edges[0].source_id, "source-id");
         assert_eq!(graph.edges[0].target_id, "target-id");
         assert_eq!(
-            resolve_drawing_id(&root, "target-id").unwrap().unwrap().path,
+            resolve_drawing_id(&root, "target-id")
+                .unwrap()
+                .unwrap()
+                .path,
             "target.excalidraw",
         );
 
@@ -502,7 +519,10 @@ mod tests {
         .expect("move target drawing");
         rebuild(&root).expect("rebuild after move");
         assert_eq!(
-            resolve_drawing_id(&root, "target-id").unwrap().unwrap().path,
+            resolve_drawing_id(&root, "target-id")
+                .unwrap()
+                .unwrap()
+                .path,
             "Moved/renamed.excalidraw",
         );
 

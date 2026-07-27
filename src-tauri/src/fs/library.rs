@@ -105,8 +105,13 @@ pub fn record_drawing_opened(app: &AppHandle, relative_path: &str) -> CommandRes
     let root = active_library_root(app)?;
     resolve_existing_drawing_path(&root, relative_path)?;
     let mut settings = load_settings(app)?;
-    let preferences = settings.preferences.entry(path_to_string(&root)).or_default();
-    preferences.recent_paths.retain(|path| path != relative_path);
+    let preferences = settings
+        .preferences
+        .entry(path_to_string(&root))
+        .or_default();
+    preferences
+        .recent_paths
+        .retain(|path| path != relative_path);
     preferences.recent_paths.insert(0, relative_path.to_owned());
     preferences.recent_paths.truncate(10);
     save_settings(app, &settings)
@@ -116,8 +121,13 @@ pub fn set_drawing_pinned(app: &AppHandle, relative_path: &str, pinned: bool) ->
     let root = active_library_root(app)?;
     resolve_existing_drawing_path(&root, relative_path)?;
     let mut settings = load_settings(app)?;
-    let preferences = settings.preferences.entry(path_to_string(&root)).or_default();
-    preferences.pinned_paths.retain(|path| path != relative_path);
+    let preferences = settings
+        .preferences
+        .entry(path_to_string(&root))
+        .or_default();
+    preferences
+        .pinned_paths
+        .retain(|path| path != relative_path);
     if pinned {
         preferences.pinned_paths.push(relative_path.to_owned());
     }
@@ -464,12 +474,20 @@ fn with_preferences(app: &AppHandle, mut state: LibraryState) -> CommandResult<L
     let Some(preferences) = settings.preferences.get(root) else {
         return Ok(state);
     };
-    let available_paths = state.drawings.iter().map(|drawing| drawing.path.as_str()).collect::<Vec<_>>();
-    state.recent_paths = preferences.recent_paths.iter()
+    let available_paths = state
+        .drawings
+        .iter()
+        .map(|drawing| drawing.path.as_str())
+        .collect::<Vec<_>>();
+    state.recent_paths = preferences
+        .recent_paths
+        .iter()
         .filter(|path| available_paths.contains(&path.as_str()))
         .cloned()
         .collect();
-    state.pinned_paths = preferences.pinned_paths.iter()
+    state.pinned_paths = preferences
+        .pinned_paths
+        .iter()
         .filter(|path| available_paths.contains(&path.as_str()))
         .cloned()
         .collect();
