@@ -78,3 +78,11 @@ Status: Accepted
 Context: macOS 26 can run App Shortcuts directly from Spotlight, but Tauri has no native Swift target from which macOS can discover App Intents. Reimplementing drawing creation in the extension would create a second, unsafe owner of LocalCanvas library state.
 Decision: Bundle a minimal native Swift App Intents extension (`LocalCanvasIntents.appex`) alongside the Tauri app. Its `New Quick Canvas` shortcut opens the `localcanvas://quick-capture` deep link; the React frontend performs the existing quick-capture flow. Build it with the tracked Xcode project and embed/re-sign it through `npm run build:macos`.
 Consequences: Direct Spotlight execution is available on macOS 26+, and the same action appears in Shortcuts/Siri. macOS release builds require Xcode and must use the Spotlight-aware build command rather than Tauri's bare bundle command. The extension contains no drawing data or write logic, preserving the frontend/Rust path as the sole owner of quick-capture behavior.
+
+## ADR-009: Store voice audio beside scenes and attach only a reference marker to the canvas
+
+Date: 2026-07-28
+Status: Accepted
+Context: Voice recordings can be large binary files, while `.excalidraw` scenes must remain portable JSON that unmodified Excalidraw can open. Embedding audio into the scene would bloat drawings and expose an unsupported custom file format.
+Decision: Write each local recording atomically to `.localcanvas/voice-notes/<path-hash>/<UUID>.webm`. Store only the UUID and MIME type in an ordinary Excalidraw marker element's `customData.localcanvas` payload. The marker is portable; playback gracefully reports a missing local recording when the drawing is opened elsewhere.
+Consequences: Audio stays local and does not compromise `.excalidraw` compatibility. Moving a drawing currently leaves its note files under the old path hash, so voice notes are intentionally a local attachment until durable drawing-ID-based migration is added.

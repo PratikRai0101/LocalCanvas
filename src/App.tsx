@@ -56,6 +56,7 @@ function App() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [versions, setVersions] = useState<SceneVersion[]>([]);
   const [canvasRevision, setCanvasRevision] = useState(0);
+  const [voiceNoteRequest, setVoiceNoteRequest] = useState(0);
   const canvasAutosave = useRef<{ flush: () => Promise<void>; suspend: () => void } | null>(null);
   const handleSaveStatus = useCallback((status: SaveStatus) => {
     if (status === "error") {
@@ -625,6 +626,8 @@ function App() {
         setIsLayersOpen((open) => !open);
       } else if (payload === "quick-capture") {
         void createQuickCapture();
+      } else if (payload === "record-voice-note" && activeDrawing) {
+        setVoiceNoteRequest((request) => request + 1);
       }
     }).then((stopListening) => {
       unlisten = stopListening;
@@ -862,6 +865,7 @@ function App() {
               onSaved={handleCanvasSaved}
               onAutosaveController={(controller) => { canvasAutosave.current = controller; }}
               portalTargets={library.drawings.filter((drawing) => drawing.path !== activeDrawing.path)}
+              voiceNoteRequest={voiceNoteRequest}
               onOpenPortal={openPortal}
             />
             {isHistoryOpen && (

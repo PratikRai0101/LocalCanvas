@@ -34,6 +34,9 @@ pub fn run() {
             let toggle_layers = MenuItemBuilder::with_id("toggle-layers", "Layers")
                 .accelerator("CmdOrCtrl+Shift+L")
                 .build(app)?;
+            let record_voice_note = MenuItemBuilder::with_id("record-voice-note", "Record Voice Note")
+                .accelerator("CmdOrCtrl+Shift+V")
+                .build(app)?;
             let quick_capture =
                 MenuItemBuilder::with_id("quick-capture", "New Quick Canvas").build(app)?;
             let show_window =
@@ -78,6 +81,7 @@ pub fn run() {
                 .item(&new_drawing)
                 .item(&new_folder)
                 .item(&import_drawing)
+                .item(&record_voice_note)
                 .separator()
                 .item(&rename)
                 .build()?;
@@ -115,7 +119,7 @@ pub fn run() {
         })
         .on_menu_event(|app, event| match event.id().as_ref() {
             "new-drawing" | "new-folder" | "import-drawing" | "rename-active"
-            | "command-palette" | "toggle-layers" => {
+            | "command-palette" | "toggle-layers" | "record-voice-note" => {
                 let _ = app.emit("menu-action", event.id().as_ref());
             }
             _ => {}
@@ -140,6 +144,9 @@ pub fn run() {
             commands::restore_scene_version,
             commands::read_thumbnail,
             commands::write_thumbnail,
+            commands::write_voice_note,
+            commands::read_voice_note,
+            commands::delete_voice_note,
             commands::read_dropped_image,
             commands::recognize_image_text,
             commands::pick_import_scene,

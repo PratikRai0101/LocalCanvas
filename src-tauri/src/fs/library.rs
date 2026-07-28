@@ -16,6 +16,7 @@ const LOCALCANVAS_DIR: &str = ".localcanvas";
 const SETTINGS_FILE: &str = "settings.json";
 const THUMBNAIL_DIR: &str = "thumbnails";
 const VERSION_DIR: &str = "versions";
+const VOICE_NOTE_DIR: &str = "voice-notes";
 const MAX_VERSION_SNAPSHOTS: usize = 50;
 const FINDER_TAG_ATTRIBUTE: &str = "com.apple.metadata:_kMDItemUserTags";
 
@@ -526,10 +527,49 @@ pub fn set_drawing_tags(
         .map_err(|error| format!("Couldn't save Finder tags: {error}"))
 }
 
+pub fn write_voice_note(
+    app: &AppHandle,
+    relative_path: &str,
+    note_id: &str,
+    contents: &[u8],
+) -> CommandResult<()> {
+    let root = active_library_root(app)?;
+    resolve_existing_drawing_path(&root, relative_path)?;
+    validate_voice_note_id(note_id)?;
+    if contents.is_empty() {
+        return Err("A voice note can't be empty.".to_owned());
+    }
+    atomic_write(&voice_note_path(&root, relative_path, note_id), contents)
+}
+
+pub fn read_voice_note(
+    app: &AppHandle,
+    relative_path: &str,
+    note_id: &str,
+) -> CommandResult<Vec<u8>> {
+    let root = active_library_root(app)?;
+    resolve_existing_drawing_path(&root, relative_path)?;
+    validate_voice_note_id(note_id)?;
+    fs::read(voice_note_path(&root, relative_path, note_id))
+        .map_err(|error| format!("Couldn't read voice note: {error}"))
+}
+
+pub fn delete_voice_note(app: &AppHandle, relative_path: &str, note_id: &str) -> CommandResult<()> {
+    let root = active_library_root(app)?;
+    resolve_existing_drawing_path(&root, relative_path)?;
+    validate_voice_note_id(note_id)?;
+    let path = voice_note_path(&root, relative_path, note_id);
+    if path.exists() {
+        fs::remove_file(path).map_err(|error| format!("Couldn't delete voice note: {error}"))?;
+    }
+    Ok(())
+}
+
 pub fn delete_drawing(app: &AppHandle, relative_path: &str) -> CommandResult<()> {
     let root = active_library_root(app)?;
     let path = resolve_existing_drawing_path(&root, relative_path)?;
     fs::remove_file(path).map_err(|error| format!("Couldn't delete drawing: {error}"))?;
+    let _ = fs::remove_dir_all(voice_note_directory(&root, relative_path));
     invalidate_thumbnail(&root, relative_path);
     Ok(())
 }
@@ -950,6 +990,22 @@ fn validate_excalidraw_scene(scene_json: &str) -> CommandResult<()> {
 
 fn invalidate_thumbnail(root: &Path, relative_path: &str) {
     let _ = fs::remove_file(thumbnail_path(root, relative_path));
+}
+
+fn voice_note_directory(root: &Path, relative_path: &str) -> PathBuf {
+    root.join(LOCALCANVAS_DIR)
+        .join(VOICE_NOTE_DIR)
+        .join(sha256_hex(relative_path.as_bytes()))
+}
+
+fn voice_note_path(root: &Path, relative_path: &str, note_id: &str) -> PathBuf {
+    voice_note_directory(root, relative_path).join(format!("{note_id}.webm"))
+}
+
+fn validate_voice_note_id(note_id: &str) -> CommandResult<()> {
+    Uuid::parse_str(note_id)
+        .map(|_| ())
+        .map_err(|_| "Voice note ID isn't valid.".to_owned())
 }
 
 fn thumbnail_path(root: &Path, relative_path: &str) -> PathBuf {

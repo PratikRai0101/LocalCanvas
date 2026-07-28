@@ -23,6 +23,7 @@ import { layerEntries, layerSignature, moveLayer, setLayerLocked, setLayerVisibi
 import { presentationFrames } from "./presentation";
 import { createPortalElements, ensureDrawingIdentity, portalTargetForSelection } from "./portalMetadata";
 import type { PortalLink } from "./portalMetadata";
+import { createVoiceNoteMarker, voiceNoteForSelection } from "./voiceNotes";
 
 type CanvasProps = {
   drawingPath: string;
@@ -33,6 +34,7 @@ type CanvasProps = {
   onSaved: () => void;
   onAutosaveController?: (controller: { flush: () => Promise<void>; suspend: () => void } | null) => void;
   portalTargets: DrawingSummary[];
+  voiceNoteRequest: number;
   onOpenPortal: (target: PortalLink) => void;
 };
 
@@ -58,6 +60,7 @@ export function Canvas({
   onSaved,
   onAutosaveController,
   portalTargets,
+  voiceNoteRequest,
   onOpenPortal,
 }: CanvasProps) {
   const [initialData, setInitialData] =
@@ -70,6 +73,8 @@ export function Canvas({
   const presentationActive = useRef(false);
   const onOpenPortalRef = useRef(onOpenPortal);
   const unsubscribePortalPointer = useRef<(() => void) | null>(null);
+  const recorder = useRef<MediaRecorder | null>(null);
+  const recordingAnchor = useRef({ x: 100, y: 100 });
   const saveTimer = useRef<number | null>(null);
   const autosaveSuspended = useRef(false);
   const layerSignatureRef = useRef("");
@@ -83,6 +88,8 @@ export function Canvas({
   const [usesNativeFileDrops, setUsesNativeFileDrops] = useState(false);
   const [portalTargetPath, setPortalTargetPath] = useState("");
   const [isCreatingPortal, setIsCreatingPortal] = useState(false);
+  const [isRecordingVoiceNote, setIsRecordingVoiceNote] = useState(false);
+  const [voiceNoteMessage, setVoiceNoteMessage] = useState<string | null>(null);
 
   useEffect(() => {
     onOpenPortalRef.current = onOpenPortal;
@@ -97,13 +104,15 @@ export function Canvas({
       if (event.detail !== 2) {
         return;
       }
-      const target = portalTargetForSelection(
-        api.getSceneElementsIncludingDeleted(),
-        api.getAppState().selectedElementIds,
-      );
-      if (target) {
-        onOpenPortalRef.current(target);
+      const elements = api.getSceneElementsIncludingDeleted();
+      const selectedElementIds = api.getAppState().selectedElementIds;
+      const voiceNote = voiceNoteForSelection(elements, selectedElementIds);
+      if (voiceNote) {
+        void playVoiceNote(voiceNote.id, voiceNote.mimeType);
+        return;
       }
+      const target = portalTargetForSelection(elements, selectedElementIds);
+      if (target) onOpenPortalRef.current(target);
     });
   }, []);
 
@@ -407,6 +416,64 @@ export function Canvas({
     };
   }, [initialData, insertNativeDroppedImage]);
 
+  async function playVoiceNote(noteId: string, mimeType: string) {
+    try {
+      const contents = await libraryApi.readVoiceNote(drawingPath, noteId);
+      const url = URL.createObjectURL(new Blob([new Uint8Array(contents)], { type: mimeType }));
+      const audio = new Audio(url);
+      audio.addEventListener("ended", () => URL.revokeObjectURL(url), { once: true });
+      await audio.play();
+    } catch (error) {
+      console.error("Failed to play voice note", error);
+      setVoiceNoteMessage("Couldn’t play this voice note.");
+    }
+  }
+
+  const startVoiceNote = useCallback(async () => {
+    if (recorder.current || !excalidrawApi.current) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      const chunks: BlobPart[] = [];
+      const selected = excalidrawApi.current.getSceneElementsIncludingDeleted()
+        .find((element) => excalidrawApi.current?.getAppState().selectedElementIds[element.id]);
+      recordingAnchor.current = selected
+        ? { x: selected.x + selected.width + 12, y: selected.y }
+        : { x: 100, y: 100 };
+      mediaRecorder.addEventListener("dataavailable", (event) => chunks.push(event.data));
+      mediaRecorder.addEventListener("stop", () => {
+        stream.getTracks().forEach((track) => track.stop());
+        recorder.current = null;
+        setIsRecordingVoiceNote(false);
+        void (async () => {
+          try {
+            const noteId = crypto.randomUUID();
+            const bytes = new Uint8Array(await new Blob(chunks, { type: "audio/webm" }).arrayBuffer());
+            await libraryApi.writeVoiceNote(drawingPath, noteId, [...bytes]);
+            const api = excalidrawApi.current;
+            if (api) api.updateScene({ elements: [...api.getSceneElementsIncludingDeleted(), ...createVoiceNoteMarker({ id: noteId, mimeType: "audio/webm" }, recordingAnchor.current.x, recordingAnchor.current.y)] });
+          } catch (error) {
+            console.error("Failed to save voice note", error);
+            setVoiceNoteMessage("Couldn’t save this voice note.");
+          }
+        })();
+      }, { once: true });
+      recorder.current = mediaRecorder;
+      mediaRecorder.start();
+      setVoiceNoteMessage(null);
+      setIsRecordingVoiceNote(true);
+    } catch (error) {
+      console.error("Failed to start voice recording", error);
+      setVoiceNoteMessage("Microphone access is required to record a voice note.");
+    }
+  }, [drawingPath]);
+
+  useEffect(() => {
+    if (voiceNoteRequest > 0) void startVoiceNote();
+  }, [startVoiceNote, voiceNoteRequest]);
+
+  const stopVoiceNote = useCallback(() => recorder.current?.stop(), []);
+
   const createPortal = useCallback(async () => {
     const api = excalidrawApi.current;
     const target = portalTargets.find((drawing) => drawing.path === portalTargetPath);
@@ -519,6 +586,11 @@ export function Canvas({
           onSetLocked={(id, locked) => updateLayers((elements) => setLayerLocked(elements, id, locked))}
           onClose={onCloseLayers}
         />
+      )}
+      {(isRecordingVoiceNote || voiceNoteMessage) && (
+        <div className="voice-note-recorder" role="status">
+          {isRecordingVoiceNote ? <><span>● Recording voice note</span><button type="button" onClick={stopVoiceNote}>Stop</button></> : <span>{voiceNoteMessage}</span>}
+        </div>
       )}
       {isPortalPickerOpen && (
         <div className="portal-picker" role="dialog" aria-label="Create portal">

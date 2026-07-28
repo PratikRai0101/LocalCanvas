@@ -167,6 +167,30 @@ pub fn write_thumbnail(
 }
 
 #[tauri::command]
+pub fn write_voice_note(
+    app: AppHandle,
+    relative_path: String,
+    note_id: String,
+    contents: Vec<u8>,
+) -> CommandResult<()> {
+    library::write_voice_note(&app, &relative_path, &note_id, &contents)
+}
+
+#[tauri::command]
+pub fn read_voice_note(
+    app: AppHandle,
+    relative_path: String,
+    note_id: String,
+) -> CommandResult<Vec<u8>> {
+    library::read_voice_note(&app, &relative_path, &note_id)
+}
+
+#[tauri::command]
+pub fn delete_voice_note(app: AppHandle, relative_path: String, note_id: String) -> CommandResult<()> {
+    library::delete_voice_note(&app, &relative_path, &note_id)
+}
+
+#[tauri::command]
 pub fn read_dropped_image(path: String) -> CommandResult<DroppedImage> {
     let path = PathBuf::from(path);
     let extension = path
