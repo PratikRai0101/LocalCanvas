@@ -33,7 +33,9 @@ signing_identity="${APPLE_SIGNING_IDENTITY:--}"
 codesign --force --sign "$signing_identity" \
   --entitlements src-tauri/LocalCanvasIntents/LocalCanvasIntents.entitlements \
   "$app/Contents/PlugIns/LocalCanvasIntents.appex"
-codesign --force --sign "$signing_identity" "$app"
+codesign --force --sign "$signing_identity" \
+  --entitlements src-tauri/Entitlements.plist \
+  "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
 
 echo "Built Spotlight-enabled app: $app"
