@@ -2,6 +2,7 @@ mod commands;
 mod fs;
 mod index;
 mod ocr;
+mod speech;
 mod watcher;
 
 use tauri::{
@@ -147,6 +148,7 @@ pub fn run() {
             commands::write_voice_note,
             commands::read_voice_note,
             commands::delete_voice_note,
+            commands::transcribe_voice_note,
             commands::read_dropped_image,
             commands::recognize_image_text,
             commands::pick_import_scene,

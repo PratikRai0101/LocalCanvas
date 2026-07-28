@@ -4,5 +4,7 @@
 <dict>
   <key>NSMicrophoneUsageDescription</key>
   <string>LocalCanvas uses your microphone to record voice notes attached to a canvas.</string>
+  <key>NSSpeechRecognitionUsageDescription</key>
+  <string>LocalCanvas transcribes voice notes on this Mac so they can be searched.</string>
 </dict>
 </plist>

@@ -9,7 +9,9 @@ type DrawingMetadata = {
   drawingId: string;
 };
 
-type ElementWithCustomData = Pick<ExcalidrawElement, "customData">;
+type ElementWithCustomData = Pick<ExcalidrawElement, "id" | "customData"> & {
+  containerId?: string | null;
+};
 
 export type DrawingIdentity = {
   drawingId: string;
@@ -95,6 +97,21 @@ export function portalTargetForSelection(
       if (containerTarget) {
         return containerTarget;
       }
+    }
+  }
+  return null;
+}
+
+export function portalMarkerIdForSelection(
+  elements: readonly ElementWithCustomData[],
+  selectedElementIds: Record<string, boolean>,
+): string | null {
+  for (const element of elements) {
+    if (!selectedElementIds[element.id]) continue;
+    if (portalTarget(element)) return element.id;
+    if (element.containerId) {
+      const container = elements.find((candidate) => candidate.id === element.containerId);
+      if (container && portalTarget(container)) return container.id;
     }
   }
   return null;

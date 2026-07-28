@@ -415,7 +415,11 @@ fn extract_text(contents: &str) -> Vec<String> {
                 .get("localcanvas")?
                 .get("ocrText")?
                 .as_str(),
-            _ => None,
+            _ => element
+                .get("customData")?
+                .get("localcanvas")?
+                .get("transcript")?
+                .as_str(),
         })
         .map(str::trim)
         .filter(|text| !text.is_empty())
@@ -454,7 +458,7 @@ mod tests {
         fs::create_dir_all(root.join("Architecture")).expect("create test library");
         fs::write(
             root.join("Architecture/auth-flow.excalidraw"),
-            r#"{"type":"excalidraw","elements":[{"type":"text","text":"Sign in with passkeys","isDeleted":false},{"type":"image","isDeleted":false,"customData":{"localcanvas":{"ocrText":"Network architecture screenshot"}}},{"type":"text","text":"ignored","isDeleted":true}],"appState":{},"files":{}}"#,
+            r#"{"type":"excalidraw","elements":[{"type":"text","text":"Sign in with passkeys","isDeleted":false},{"type":"image","isDeleted":false,"customData":{"localcanvas":{"ocrText":"Network architecture screenshot"}}},{"type":"ellipse","isDeleted":false,"customData":{"localcanvas":{"kind":"voice-note","transcript":"Discuss offline backup plan"}}},{"type":"text","text":"ignored","isDeleted":true}],"appState":{},"files":{}}"#,
         )
         .expect("write drawing");
         fs::write(
@@ -465,7 +469,7 @@ mod tests {
 
         let stats = rebuild(&root).expect("rebuild index");
         assert_eq!(stats.drawing_count, 2);
-        assert_eq!(stats.indexed_text_elements, 2);
+        assert_eq!(stats.indexed_text_elements, 3);
         assert_eq!(
             search(&root, "passkey").unwrap()[0].path,
             "Architecture/auth-flow.excalidraw"
@@ -476,6 +480,10 @@ mod tests {
         );
         assert_eq!(
             search(&root, "architecture screenshot").unwrap()[0].path,
+            "Architecture/auth-flow.excalidraw"
+        );
+        assert_eq!(
+            search(&root, "offline backup").unwrap()[0].path,
             "Architecture/auth-flow.excalidraw"
         );
         assert!(search(&root, "ignored").unwrap().is_empty());

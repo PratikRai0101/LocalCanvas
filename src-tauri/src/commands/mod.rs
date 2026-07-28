@@ -171,9 +171,10 @@ pub fn write_voice_note(
     app: AppHandle,
     relative_path: String,
     note_id: String,
+    mime_type: String,
     contents: Vec<u8>,
 ) -> CommandResult<()> {
-    library::write_voice_note(&app, &relative_path, &note_id, &contents)
+    library::write_voice_note(&app, &relative_path, &note_id, &mime_type, &contents)
 }
 
 #[tauri::command]
@@ -181,13 +182,29 @@ pub fn read_voice_note(
     app: AppHandle,
     relative_path: String,
     note_id: String,
+    mime_type: String,
 ) -> CommandResult<Vec<u8>> {
-    library::read_voice_note(&app, &relative_path, &note_id)
+    library::read_voice_note(&app, &relative_path, &note_id, &mime_type)
 }
 
 #[tauri::command]
-pub fn delete_voice_note(app: AppHandle, relative_path: String, note_id: String) -> CommandResult<()> {
-    library::delete_voice_note(&app, &relative_path, &note_id)
+pub fn delete_voice_note(
+    app: AppHandle,
+    relative_path: String,
+    note_id: String,
+    mime_type: String,
+) -> CommandResult<()> {
+    library::delete_voice_note(&app, &relative_path, &note_id, &mime_type)
+}
+
+#[tauri::command]
+pub fn transcribe_voice_note(
+    app: AppHandle,
+    relative_path: String,
+    note_id: String,
+    mime_type: String,
+) -> CommandResult<String> {
+    library::transcribe_voice_note(&app, &relative_path, &note_id, &mime_type)
 }
 
 #[tauri::command]

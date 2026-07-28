@@ -167,6 +167,17 @@ kbd, .search-shortcut { padding: 1px 4px; color: #9e9ba1; background: #fff; bord
 .presentation-message { align-self: center; max-width: 180px; padding: 5px 7px; color: #5d5964; background: rgba(255, 255, 255, .94); border: 1px solid #dedce0; border-radius: 5px; font-size: 10px; }
 .voice-note-recorder { position: absolute; z-index: 4; top: 78px; right: 16px; left: auto; height: auto !important; transform: none; display: flex; align-items: center; gap: 10px; padding: 9px 12px; color: #7c2d12; background: #fffbeb; border: 1px solid #f59e0b; border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .14); font-size: 12px; font-weight: 600; }
 .voice-note-recorder button { padding: 4px 8px; color: #fff; background: #b91c1c; border: 0; border-radius: 5px; font: inherit; }
+.canvas-attachment-panel { position: absolute; z-index: 4; top: 78px; right: 16px; width: 258px; height: auto !important; padding: 11px; color: #4e4b54; background: rgba(255, 255, 255, .98); border: 1px solid #dedce0; border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .14); font: 500 11px Inter, sans-serif; }
+.canvas-attachment-panel.is-recording { top: 128px; }
+.canvas-attachment-panel header { display: flex; align-items: center; justify-content: space-between; color: #39363e; font-size: 12px; }
+.canvas-attachment-panel header span { color: #908c96; font-variant-numeric: tabular-nums; }
+.attachment-detail, .attachment-transcript { margin: 7px 0 0; color: #77737c; line-height: 1.35; }
+.attachment-transcript { max-height: 78px; overflow: auto; padding: 7px; background: #f7f6f8; border-radius: 5px; }
+.attachment-actions { display: flex; gap: 5px; margin-top: 9px; }
+.attachment-actions button { padding: 5px 7px; color: #4e4b54; background: #f4f3f6; border: 1px solid #dedce0; border-radius: 5px; font: inherit; cursor: pointer; }
+.attachment-actions button:hover:not(:disabled) { border-color: #aaa6df; color: #514da6; }
+.attachment-actions button:disabled { cursor: wait; opacity: .58; }
+.attachment-actions .attachment-delete { margin-left: auto; color: #a23f45; }
 .portal-picker { position: absolute; z-index: 3; top: 50px; right: 14px; width: 240px; padding: 12px; color: #4e4b54; background: #fff; border: 1px solid #dedce0; border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .14); font-size: 11px; }
 .layers-panel { position: absolute; z-index: 4; top: 73px; right: 14px; bottom: 14px; display: flex; width: 278px; flex-direction: column; color: #4e4b54; background: rgba(255, 255, 255, .98); border: 1px solid #dedce0; border-radius: 9px; box-shadow: 0 10px 32px rgba(0, 0, 0, .16); }
 .layers-panel header { display: flex; align-items: flex-start; justify-content: space-between; padding: 13px 13px 10px; border-bottom: 1px solid #ece9ed; }

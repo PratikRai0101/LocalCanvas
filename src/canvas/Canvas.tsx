@@ -21,9 +21,10 @@ import { LayersPanel } from "./LayersPanel";
 import { attachOcrText } from "./ocrMetadata";
 import { layerEntries, layerSignature, moveLayer, setLayerLocked, setLayerVisibility } from "./layers";
 import { presentationFrames } from "./presentation";
-import { createPortalElements, ensureDrawingIdentity, portalTargetForSelection } from "./portalMetadata";
+import { createPortalElements, ensureDrawingIdentity, portalMarkerIdForSelection, portalTargetForSelection } from "./portalMetadata";
 import type { PortalLink } from "./portalMetadata";
-import { createVoiceNoteMarker, voiceNoteForSelection } from "./voiceNotes";
+import { createVoiceNoteMarker, formatVoiceNoteDuration, voiceNoteForSelection, voiceNoteMarkerIdForSelection } from "./voiceNotes";
+import type { VoiceNote } from "./voiceNotes";
 
 type CanvasProps = {
   drawingPath: string;
@@ -48,6 +49,9 @@ type SceneSnapshot = {
   files: SceneChange[2];
 };
 type PresentationFrame = Extract<SceneChange[0][number], { type: "frame" | "magicframe" }>;
+type SelectedAttachment =
+  | { kind: "voice-note"; markerId: string; note: VoiceNote }
+  | { kind: "portal"; markerId: string; target: PortalLink };
 
 const AUTOSAVE_DELAY_MS = 800;
 
@@ -74,7 +78,10 @@ export function Canvas({
   const onOpenPortalRef = useRef(onOpenPortal);
   const unsubscribePortalPointer = useRef<(() => void) | null>(null);
   const recorder = useRef<MediaRecorder | null>(null);
+  const recordingStartedAt = useRef(0);
   const recordingAnchor = useRef({ x: 100, y: 100 });
+  const playbackAudio = useRef<HTMLAudioElement | null>(null);
+  const selectedAttachmentSignature = useRef("");
   const saveTimer = useRef<number | null>(null);
   const autosaveSuspended = useRef(false);
   const layerSignatureRef = useRef("");
@@ -90,12 +97,37 @@ export function Canvas({
   const [isCreatingPortal, setIsCreatingPortal] = useState(false);
   const [isRecordingVoiceNote, setIsRecordingVoiceNote] = useState(false);
   const [voiceNoteMessage, setVoiceNoteMessage] = useState<string | null>(null);
+  const [playingVoiceNoteId, setPlayingVoiceNoteId] = useState<string | null>(null);
+  const [selectedAttachment, setSelectedAttachment] = useState<SelectedAttachment | null>(null);
+  const [isTranscribingVoiceNote, setIsTranscribingVoiceNote] = useState(false);
 
   useEffect(() => {
     onOpenPortalRef.current = onOpenPortal;
   }, [onOpenPortal]);
 
   useEffect(() => () => unsubscribePortalPointer.current?.(), []);
+
+  const updateSelectedAttachment = useCallback((
+    elements: readonly ExcalidrawElement[],
+    selectedElementIds: Record<string, boolean>,
+  ) => {
+    const voiceNote = voiceNoteForSelection(elements, selectedElementIds);
+    const voiceMarkerId = voiceNoteMarkerIdForSelection(elements, selectedElementIds);
+    const portalTarget = voiceNote ? null : portalTargetForSelection(elements, selectedElementIds);
+    const portalMarkerId = portalTarget ? portalMarkerIdForSelection(elements, selectedElementIds) : null;
+    const next = voiceNote && voiceMarkerId
+      ? { kind: "voice-note" as const, markerId: voiceMarkerId, note: voiceNote }
+      : portalTarget && portalMarkerId
+        ? { kind: "portal" as const, markerId: portalMarkerId, target: portalTarget }
+        : null;
+    const signature = next
+      ? `${next.kind}:${next.markerId}:${next.kind === "voice-note" ? next.note.transcript ?? "" : next.target.targetId}`
+      : "";
+    if (signature !== selectedAttachmentSignature.current) {
+      selectedAttachmentSignature.current = signature;
+      setSelectedAttachment(next);
+    }
+  }, []);
 
   const bindExcalidrawApi = useCallback((api: ExcalidrawImperativeAPI) => {
     excalidrawApi.current = api;
@@ -114,7 +146,8 @@ export function Canvas({
       const target = portalTargetForSelection(elements, selectedElementIds);
       if (target) onOpenPortalRef.current(target);
     });
-  }, []);
+    updateSelectedAttachment(api.getSceneElementsIncludingDeleted(), api.getAppState().selectedElementIds);
+  }, [updateSelectedAttachment]);
 
   const saveLatestScene = useCallback(async () => {
     const scene = latestScene.current;
@@ -416,24 +449,95 @@ export function Canvas({
     };
   }, [initialData, insertNativeDroppedImage]);
 
+  const stopVoicePlayback = useCallback(() => {
+    playbackAudio.current?.pause();
+    playbackAudio.current = null;
+    setPlayingVoiceNoteId(null);
+  }, []);
+
   async function playVoiceNote(noteId: string, mimeType: string) {
+    if (playingVoiceNoteId === noteId) {
+      stopVoicePlayback();
+      return;
+    }
+    stopVoicePlayback();
     try {
-      const contents = await libraryApi.readVoiceNote(drawingPath, noteId);
+      const contents = await libraryApi.readVoiceNote(drawingPath, noteId, mimeType);
       const url = URL.createObjectURL(new Blob([new Uint8Array(contents)], { type: mimeType }));
       const audio = new Audio(url);
-      audio.addEventListener("ended", () => URL.revokeObjectURL(url), { once: true });
+      playbackAudio.current = audio;
+      const finish = () => {
+        URL.revokeObjectURL(url);
+        if (playbackAudio.current === audio) {
+          playbackAudio.current = null;
+          setPlayingVoiceNoteId(null);
+        }
+      };
+      audio.addEventListener("ended", finish, { once: true });
+      audio.addEventListener("error", finish, { once: true });
       await audio.play();
+      setPlayingVoiceNoteId(noteId);
     } catch (error) {
       console.error("Failed to play voice note", error);
-      setVoiceNoteMessage("Couldn’t play this voice note.");
+      setVoiceNoteMessage("This voice-note audio is unavailable on this Mac.");
     }
   }
+
+  const deleteVoiceNote = useCallback(async (markerId: string, note: VoiceNote) => {
+    const api = excalidrawApi.current;
+    if (!api || !window.confirm("Delete this voice note and its local audio?")) return;
+    try {
+      if (playingVoiceNoteId === note.id) stopVoicePlayback();
+      await libraryApi.deleteVoiceNote(drawingPath, note.id, note.mimeType);
+      api.updateScene({
+        elements: api.getSceneElementsIncludingDeleted().map((element) =>
+          element.id === markerId || ("containerId" in element && element.containerId === markerId)
+            ? { ...element, isDeleted: true }
+            : element,
+        ),
+      });
+      setSelectedAttachment(null);
+    } catch (error) {
+      console.error("Failed to delete voice note", error);
+      setVoiceNoteMessage("Couldn’t delete this voice note.");
+    }
+  }, [drawingPath, playingVoiceNoteId, stopVoicePlayback]);
+
+  const transcribeVoiceNote = useCallback(async (markerId: string, note: VoiceNote) => {
+    const api = excalidrawApi.current;
+    if (!api) return;
+    setIsTranscribingVoiceNote(true);
+    setVoiceNoteMessage(null);
+    try {
+      const transcript = await libraryApi.transcribeVoiceNote(drawingPath, note.id, note.mimeType);
+      const elements = api.getSceneElementsIncludingDeleted().map((element) => {
+        if (element.id !== markerId) return element;
+        const localcanvas = element.customData?.localcanvas;
+        return {
+          ...element,
+          customData: {
+            ...element.customData,
+            localcanvas: { ...localcanvas, transcript },
+          },
+        };
+      });
+      api.updateScene({ elements });
+      setSelectedAttachment({ kind: "voice-note", markerId, note: { ...note, transcript } });
+    } catch (error) {
+      console.error("Failed to transcribe voice note", error);
+      setVoiceNoteMessage(error instanceof Error ? error.message : "Couldn’t transcribe this voice note locally.");
+    } finally {
+      setIsTranscribingVoiceNote(false);
+    }
+  }, [drawingPath]);
 
   const startVoiceNote = useCallback(async () => {
     if (recorder.current || !excalidrawApi.current) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      const mimeType = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"]
+        .find((candidate) => MediaRecorder.isTypeSupported(candidate)) ?? "";
+      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       const chunks: BlobPart[] = [];
       const selected = excalidrawApi.current.getSceneElementsIncludingDeleted()
         .find((element) => excalidrawApi.current?.getAppState().selectedElementIds[element.id]);
@@ -448,10 +552,19 @@ export function Canvas({
         void (async () => {
           try {
             const noteId = crypto.randomUUID();
-            const bytes = new Uint8Array(await new Blob(chunks, { type: "audio/webm" }).arrayBuffer());
-            await libraryApi.writeVoiceNote(drawingPath, noteId, [...bytes]);
+            const actualMimeType = mediaRecorder.mimeType || "audio/webm";
+            const durationMs = Math.max(0, Date.now() - recordingStartedAt.current);
+            const bytes = new Uint8Array(await new Blob(chunks, { type: actualMimeType }).arrayBuffer());
+            await libraryApi.writeVoiceNote(drawingPath, noteId, actualMimeType, [...bytes]);
             const api = excalidrawApi.current;
-            if (api) api.updateScene({ elements: [...api.getSceneElementsIncludingDeleted(), ...createVoiceNoteMarker({ id: noteId, mimeType: "audio/webm" }, recordingAnchor.current.x, recordingAnchor.current.y)] });
+            if (api) api.updateScene({
+              elements: [...api.getSceneElementsIncludingDeleted(), ...createVoiceNoteMarker({
+                id: noteId,
+                mimeType: actualMimeType,
+                durationMs,
+                attachedToElementId: selected?.id,
+              }, recordingAnchor.current.x, recordingAnchor.current.y)],
+            });
           } catch (error) {
             console.error("Failed to save voice note", error);
             setVoiceNoteMessage("Couldn’t save this voice note.");
@@ -459,6 +572,7 @@ export function Canvas({
         })();
       }, { once: true });
       recorder.current = mediaRecorder;
+      recordingStartedAt.current = Date.now();
       mediaRecorder.start();
       setVoiceNoteMessage(null);
       setIsRecordingVoiceNote(true);
@@ -473,6 +587,19 @@ export function Canvas({
   }, [startVoiceNote, voiceNoteRequest]);
 
   const stopVoiceNote = useCallback(() => recorder.current?.stop(), []);
+
+  const unlinkPortal = useCallback((markerId: string) => {
+    const api = excalidrawApi.current;
+    if (!api || !window.confirm("Remove this canvas link?")) return;
+    api.updateScene({
+      elements: api.getSceneElementsIncludingDeleted().map((element) =>
+        element.id === markerId || ("containerId" in element && element.containerId === markerId)
+          ? { ...element, isDeleted: true }
+          : element,
+      ),
+    });
+    setSelectedAttachment(null);
+  }, []);
 
   const createPortal = useCallback(async () => {
     const api = excalidrawApi.current;
@@ -526,6 +653,7 @@ export function Canvas({
         files: change[2],
       };
       setFrameCount(presentationFrames(change[0]).length);
+      updateSelectedAttachment(change[0], change[1].selectedElementIds);
       if (isLayersOpen) {
         const nextLayerSignature = layerSignature(change[0]);
         if (nextLayerSignature !== layerSignatureRef.current) {
@@ -545,7 +673,7 @@ export function Canvas({
         void saveLatestScene();
       }, AUTOSAVE_DELAY_MS);
     },
-    [isLayersOpen, saveLatestScene],
+    [isLayersOpen, saveLatestScene, updateSelectedAttachment],
   );
 
   if (loadError) {
@@ -591,6 +719,35 @@ export function Canvas({
         <div className="voice-note-recorder" role="status">
           {isRecordingVoiceNote ? <><span>● Recording voice note</span><button type="button" onClick={stopVoiceNote}>Stop</button></> : <span>{voiceNoteMessage}</span>}
         </div>
+      )}
+      {selectedAttachment && !isPresenting && (
+        <aside className={`canvas-attachment-panel ${isRecordingVoiceNote ? "is-recording" : ""}`} aria-label={selectedAttachment.kind === "voice-note" ? "Voice note" : "Canvas link"}>
+          {selectedAttachment.kind === "voice-note" ? (
+            <>
+              <header><strong>Voice note</strong><span>{formatVoiceNoteDuration(selectedAttachment.note.durationMs)}</span></header>
+              {selectedAttachment.note.attachedToElementId && <p className="attachment-detail">Attached to a canvas item</p>}
+              <div className="attachment-actions">
+                <button type="button" onClick={() => void playVoiceNote(selectedAttachment.note.id, selectedAttachment.note.mimeType)}>
+                  {playingVoiceNoteId === selectedAttachment.note.id ? "Stop" : "Play"}
+                </button>
+                <button type="button" onClick={() => void transcribeVoiceNote(selectedAttachment.markerId, selectedAttachment.note)} disabled={isTranscribingVoiceNote}>
+                  {isTranscribingVoiceNote ? "Transcribing…" : selectedAttachment.note.transcript ? "Re-transcribe" : "Transcribe"}
+                </button>
+                <button className="attachment-delete" type="button" onClick={() => void deleteVoiceNote(selectedAttachment.markerId, selectedAttachment.note)}>Delete</button>
+              </div>
+              <p className="attachment-transcript">{selectedAttachment.note.transcript || "No transcript yet. Transcription stays on this Mac."}</p>
+            </>
+          ) : (
+            <>
+              <header><strong>Canvas link</strong></header>
+              <p className="attachment-detail">Double-click opens the linked canvas.</p>
+              <div className="attachment-actions">
+                <button type="button" onClick={() => onOpenPortalRef.current(selectedAttachment.target)}>Open</button>
+                <button className="attachment-delete" type="button" onClick={() => unlinkPortal(selectedAttachment.markerId)}>Unlink</button>
+              </div>
+            </>
+          )}
+        </aside>
       )}
       {isPortalPickerOpen && (
         <div className="portal-picker" role="dialog" aria-label="Create portal">

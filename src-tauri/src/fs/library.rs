@@ -531,45 +531,85 @@ pub fn write_voice_note(
     app: &AppHandle,
     relative_path: &str,
     note_id: &str,
+    mime_type: &str,
     contents: &[u8],
 ) -> CommandResult<()> {
     let root = active_library_root(app)?;
-    resolve_existing_drawing_path(&root, relative_path)?;
+    let drawing = resolve_existing_drawing_path(&root, relative_path)?;
     validate_voice_note_id(note_id)?;
     if contents.is_empty() {
         return Err("A voice note can't be empty.".to_owned());
     }
-    atomic_write(&voice_note_path(&root, relative_path, note_id), contents)
+    atomic_write(&voice_note_path(&root, &drawing, note_id, mime_type)?, contents)
 }
 
 pub fn read_voice_note(
     app: &AppHandle,
     relative_path: &str,
     note_id: &str,
+    mime_type: &str,
 ) -> CommandResult<Vec<u8>> {
     let root = active_library_root(app)?;
-    resolve_existing_drawing_path(&root, relative_path)?;
+    let drawing = resolve_existing_drawing_path(&root, relative_path)?;
     validate_voice_note_id(note_id)?;
-    fs::read(voice_note_path(&root, relative_path, note_id))
-        .map_err(|error| format!("Couldn't read voice note: {error}"))
+    let primary = voice_note_path(&root, &drawing, note_id, mime_type)?;
+    let legacy = legacy_voice_note_path(&root, &drawing, note_id, mime_type)?;
+    fs::read(&primary).or_else(|error| {
+        if error.kind() == std::io::ErrorKind::NotFound {
+            fs::read(legacy)
+        } else {
+            Err(error)
+        }
+    }).map_err(|error| format!("Couldn't read voice note: {error}"))
 }
 
-pub fn delete_voice_note(app: &AppHandle, relative_path: &str, note_id: &str) -> CommandResult<()> {
+pub fn delete_voice_note(
+    app: &AppHandle,
+    relative_path: &str,
+    note_id: &str,
+    mime_type: &str,
+) -> CommandResult<()> {
     let root = active_library_root(app)?;
-    resolve_existing_drawing_path(&root, relative_path)?;
+    let drawing = resolve_existing_drawing_path(&root, relative_path)?;
     validate_voice_note_id(note_id)?;
-    let path = voice_note_path(&root, relative_path, note_id);
-    if path.exists() {
-        fs::remove_file(path).map_err(|error| format!("Couldn't delete voice note: {error}"))?;
+    for path in [
+        voice_note_path(&root, &drawing, note_id, mime_type)?,
+        legacy_voice_note_path(&root, &drawing, note_id, mime_type)?,
+    ] {
+        if path.exists() {
+            fs::remove_file(path).map_err(|error| format!("Couldn't delete voice note: {error}"))?;
+        }
     }
     Ok(())
+}
+
+pub fn transcribe_voice_note(
+    app: &AppHandle,
+    relative_path: &str,
+    note_id: &str,
+    mime_type: &str,
+) -> CommandResult<String> {
+    let root = active_library_root(app)?;
+    let drawing = resolve_existing_drawing_path(&root, relative_path)?;
+    validate_voice_note_id(note_id)?;
+    if mime_type.split(';').next().unwrap_or_default() != "audio/mp4" {
+        return Err("This recording format can't be transcribed locally. Record a new voice note to enable transcription.".to_owned());
+    }
+    let primary = voice_note_path(&root, &drawing, note_id, mime_type)?;
+    let path = if primary.exists() {
+        primary
+    } else {
+        legacy_voice_note_path(&root, &drawing, note_id, mime_type)?
+    };
+    crate::speech::transcribe_audio(&path)
 }
 
 pub fn delete_drawing(app: &AppHandle, relative_path: &str) -> CommandResult<()> {
     let root = active_library_root(app)?;
     let path = resolve_existing_drawing_path(&root, relative_path)?;
+    let voice_directory = voice_note_directory(&root, &path)?;
     fs::remove_file(path).map_err(|error| format!("Couldn't delete drawing: {error}"))?;
-    let _ = fs::remove_dir_all(voice_note_directory(&root, relative_path));
+    let _ = fs::remove_dir_all(voice_directory);
     invalidate_thumbnail(&root, relative_path);
     Ok(())
 }
@@ -581,7 +621,17 @@ pub fn delete_folder(app: &AppHandle, relative_path: &str) -> CommandResult<()> 
 
     let root = active_library_root(app)?;
     let path = resolve_directory_path(&root, relative_path)?;
-    fs::remove_dir_all(path).map_err(|error| format!("Couldn't delete folder: {error}"))
+    let voice_directories = WalkDir::new(&path)
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|entry| entry.file_type().is_file() && is_excalidraw_file(entry.path()))
+        .filter_map(|entry| voice_note_directory(&root, entry.path()).ok())
+        .collect::<Vec<_>>();
+    fs::remove_dir_all(path).map_err(|error| format!("Couldn't delete folder: {error}"))?;
+    for directory in voice_directories {
+        let _ = fs::remove_dir_all(directory);
+    }
+    Ok(())
 }
 
 pub fn rename_drawing(
@@ -992,14 +1042,42 @@ fn invalidate_thumbnail(root: &Path, relative_path: &str) {
     let _ = fs::remove_file(thumbnail_path(root, relative_path));
 }
 
-fn voice_note_directory(root: &Path, relative_path: &str) -> PathBuf {
-    root.join(LOCALCANVAS_DIR)
-        .join(VOICE_NOTE_DIR)
-        .join(sha256_hex(relative_path.as_bytes()))
+fn voice_note_directory(root: &Path, drawing_path: &Path) -> CommandResult<PathBuf> {
+    let contents = fs::read_to_string(drawing_path)
+        .map_err(|error| format!("Couldn't read drawing metadata: {error}"))?;
+    let relative_path = relative_path(root, drawing_path)?;
+    let stable_key = drawing_identity(&contents).unwrap_or_else(|| sha256_hex(relative_path.as_bytes()));
+    Ok(root.join(LOCALCANVAS_DIR).join(VOICE_NOTE_DIR).join(stable_key))
 }
 
-fn voice_note_path(root: &Path, relative_path: &str, note_id: &str) -> PathBuf {
-    voice_note_directory(root, relative_path).join(format!("{note_id}.webm"))
+fn voice_note_path(root: &Path, drawing_path: &Path, note_id: &str, mime_type: &str) -> CommandResult<PathBuf> {
+    Ok(voice_note_directory(root, drawing_path)?.join(format!("{note_id}.{}", voice_note_extension(mime_type)?)))
+}
+
+fn legacy_voice_note_path(root: &Path, drawing_path: &Path, note_id: &str, mime_type: &str) -> CommandResult<PathBuf> {
+    let relative = relative_path(root, drawing_path)?;
+    Ok(root.join(LOCALCANVAS_DIR)
+        .join(VOICE_NOTE_DIR)
+        .join(sha256_hex(relative.as_bytes()))
+        .join(format!("{note_id}.{}", voice_note_extension(mime_type)?)))
+}
+
+fn voice_note_extension(mime_type: &str) -> CommandResult<&'static str> {
+    match mime_type.split(';').next().unwrap_or_default() {
+        "audio/mp4" => Ok("m4a"),
+        "audio/webm" => Ok("webm"),
+        _ => Err("Unsupported voice note format.".to_owned()),
+    }
+}
+
+fn drawing_identity(contents: &str) -> Option<String> {
+    let scene: Value = serde_json::from_str(contents).ok()?;
+    scene.get("elements")?.as_array()?.iter().find_map(|element| {
+        let localcanvas = element.get("customData")?.get("localcanvas")?;
+        (localcanvas.get("kind")?.as_str() == Some("drawing-metadata"))
+            .then(|| localcanvas.get("drawingId")?.as_str().map(ToOwned::to_owned))
+            .flatten()
+    })
 }
 
 fn validate_voice_note_id(note_id: &str) -> CommandResult<()> {
@@ -1076,7 +1154,7 @@ mod tests {
     use super::{
         atomic_write, blank_scene, drawing_file_name, invalidate_thumbnail, list_versions_at,
         read_version_at, restore_version_at, safe_join, thumbnail_path, validate_excalidraw_scene,
-        write_scene_at,
+        voice_note_directory, write_scene_at,
     };
     use std::{env, fs};
     use uuid::Uuid;
@@ -1115,6 +1193,24 @@ mod tests {
             1
         );
         fs::remove_dir_all(directory).expect("remove test directory");
+    }
+
+    #[test]
+    fn keeps_voice_note_directory_stable_when_a_drawing_moves() {
+        let root = env::temp_dir().join(format!("localcanvas-test-{}", Uuid::new_v4()));
+        fs::create_dir_all(root.join("Moved")).expect("create test library");
+        let source = root.join("source.excalidraw");
+        fs::write(
+            &source,
+            r#"{"type":"excalidraw","elements":[{"customData":{"localcanvas":{"kind":"drawing-metadata","drawingId":"stable-drawing-id"}}}],"appState":{},"files":{}}"#,
+        ).expect("write drawing");
+        let before = voice_note_directory(&root, &source).expect("voice directory before move");
+        let destination = root.join("Moved/renamed.excalidraw");
+        fs::rename(&source, &destination).expect("move drawing");
+        let after = voice_note_directory(&root, &destination).expect("voice directory after move");
+
+        assert_eq!(before, after);
+        fs::remove_dir_all(root).expect("remove test directory");
     }
 
     #[test]

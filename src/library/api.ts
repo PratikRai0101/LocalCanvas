@@ -74,12 +74,14 @@ export const libraryApi = {
     invoke<string | null>("read_thumbnail", { relativePath }),
   writeThumbnail: (relativePath: string, thumbnailSvg: string) =>
     invoke<void>("write_thumbnail", { relativePath, thumbnailSvg }),
-  writeVoiceNote: (relativePath: string, noteId: string, contents: number[]) =>
-    invoke<void>("write_voice_note", { relativePath, noteId, contents }),
-  readVoiceNote: (relativePath: string, noteId: string) =>
-    invoke<number[]>("read_voice_note", { relativePath, noteId }),
-  deleteVoiceNote: (relativePath: string, noteId: string) =>
-    invoke<void>("delete_voice_note", { relativePath, noteId }),
+  writeVoiceNote: (relativePath: string, noteId: string, mimeType: string, contents: number[]) =>
+    invoke<void>("write_voice_note", { relativePath, noteId, mimeType, contents }),
+  readVoiceNote: (relativePath: string, noteId: string, mimeType: string) =>
+    invoke<number[]>("read_voice_note", { relativePath, noteId, mimeType }),
+  deleteVoiceNote: (relativePath: string, noteId: string, mimeType: string) =>
+    invoke<void>("delete_voice_note", { relativePath, noteId, mimeType }),
+  transcribeVoiceNote: (relativePath: string, noteId: string, mimeType: string) =>
+    invoke<string>("transcribe_voice_note", { relativePath, noteId, mimeType }),
   readDroppedImage: (path: string) => invoke<DroppedImage>("read_dropped_image", { path }),
   recognizeImageText: (imageBytes: number[]) =>
     invoke<string>("recognize_image_text", { imageBytes }),

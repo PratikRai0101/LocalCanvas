@@ -2,7 +2,9 @@ fn main() {
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
         cc::Build::new()
             .file("src/ocr.m")
-            .compile("localcanvas_ocr");
+            .file("src/speech.m")
+            .compile("localcanvas_native");
+        println!("cargo:rustc-link-lib=framework=Speech");
         println!("cargo:rustc-link-lib=framework=Vision");
         println!("cargo:rustc-link-lib=framework=Foundation");
     }
