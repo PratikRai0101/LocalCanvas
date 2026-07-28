@@ -7,7 +7,7 @@ import Foundation
 struct NewQuickCanvasIntent: AppIntent {
     static let title: LocalizedStringResource = "New Quick Canvas"
     static let description = IntentDescription("Create and open a new quick canvas in LocalCanvas.")
-    static let supportedModes: IntentModes = .foreground(.immediate)
+    static let supportedModes: IntentModes = .background
 
     func perform() async throws -> some IntentResult {
         guard let url = URL(string: "localcanvas://quick-capture") else {
